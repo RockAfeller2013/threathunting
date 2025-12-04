@@ -1,0 +1,35 @@
+https://community.broadcom.com/symantecenterprise/communities/communityhomeblogs?CommunityKey=cee5f4c1-8f6b-4dbf-bffb-02ce217a2d76
+
+Active Sensor Policies
+Schedule
+Description:
+See every policy running on the sensor.
+Results:
+Lists policies running on the sensor, such as ASMI, DRE, and console-defined policies. Console-defined policies include the policy name and time stamp.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM cb_sensor_status
+WHERE category='Rules'
+  OR (category='General'
+      AND name='LastManifestContentUpdate')
+  OR (category='General'
+      AND name='DefenseEnabled')
+  OR (category='General'
+      AND name='PolicyName')
+  OR (category='General'
+      AND name='PolicyTimestamp');
+
+AMSI Status
+Schedule
+Description:
+Detect devices with AMSI disabled.
+Results:
+Lists device and AMSI status.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM cb_sensor_configprops
+WHERE name='AmsiEnabled'
+  AND value='0';
+
