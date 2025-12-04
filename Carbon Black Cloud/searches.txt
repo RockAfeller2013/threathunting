@@ -1,1 +1,497 @@
+1. Suspicious PowerShell (encoded, obfuscated, or download behavior)
+
+(process_name:powershell.exe OR process_name:pwsh.exe) AND process_cmdline:(EncodedCommand OR FromBase64String OR * -enc * OR DownloadString)
+
+Why this is useful:
+These are the most common flags for attacker-style PowerShell. EncodedCommand, -enc, and FromBase64String show up constantly in malware and living-off-the-land attacks.
+
+2. Suspicious Script Hosts (LOLbins abused by attackers)
+
+process_name:(wscript.exe OR cscript.exe OR mshta.exe)
+
+Why this is useful:
+Attackers love these built-in Windows script engines because they bypass many security tools. Legitimate usage is low in most environments, so anything here is interesting
+
+3. New User Creation Indicators
+
+process_cmdline:("net user" OR "net1 user" OR "New-LocalUser" OR "Add-LocalGroupMember")
+
+Why this is useful:
+New local accounts are a strong indicator of lateral movement or privilege escalation. Very few processes legitimately create local users.
+
+4. Processes Making Any Network Connections (Better way to do this is exclude your DHCP scope so you can find say all outbound connections)
+
+netconn_count:[1 TO *]
+
+Why this is useful:
+This is the fastest way to identify processes that are “talking out,” which is how attackers perform recon, download payloads, and establish C2.
+
+5. — High Registry Modification Activity (noisy processes)
+—--
+
+regmod_count:[50 TO *]
+
+Why this is useful:
+Most processes barely touch the registry. High-volume registry modification can indicate installers, tampering, persistence, or malware configuration changes.
+
+This surfaces
+Installers
+
+Updaters
+
+Malware
+
+Processes doing configuration changes
+
+Persistence attempts
+
+Services being created
+
+Drivers being modified
+
+—--
+
+
+Endpoint Standard Kung Fu tip #1 -- Kung Fu using Windows Event Reporting (werfault.exe) for a memory dump 
+
+If you wanted to look for machines in your network that may be generating a memory dump due to errors with the OS or applications not playing nicely in the environment you could search for werfault.exe.
+
+Werfault.exe is used for Windows error reporting and this feature that allows Microsoft to track and address errors relating to the operating system, Windows features, and applications. Werfault is also involved when it comes to creating a memory dump. We can use Defense to search for this because we have a TTP called DUMP_PROCESS_MEMORY. So if you have a host that is hanging or having problems in general in your environment, you can search for a memory dump on a remote system by doing the following command.
+
+Endpoint Standard Kung Fu tip #2 -- Doing an investigation in potentially suspicious directories and looking for files that have an unknown or not listed reputation 
+
+Let's say I have a reason to believe that a host on my network is generating alerts and may be appearing to be suspicious. I want to take a look to see if the machine has had any garbage run in the AppData or Temp directories and may not be a "trusted file" to Carbon Black. I could run a query like this below.
+
+(process_name:appdata/* OR process_name:temp/*) AND (process_effective_reputation:NOT_LISTED OR process_effective_reputation:UNKNOWN OR process_effective_reputation:ADAPTIVE_WHITE_LIST)
+
+That may return a ton of results so let's break it down a bit further.
+
+Let's add the hostname to make the search data returned a smaller subset that we could review easier. ( I added quotes for hostname though not needed unless you use spaces in your hostname)
+
+(process_name:appdata/* OR process_name:temp/*) AND (process_effective_reputation:NOT_LISTED OR process_effective_reputation:UNKNOWN OR process_effective_reputation:ADAPTIVE_WHITE_LIST) AND device_name:"Kirk's Desktop"
+
+Using the information returned from the searches above I may have what I may be what I need, but if I want to go further, I could also look for unsigned files for example. Add that to the end of the search, and it will look like this below.
+
+(process_name:appdata/* OR process_name:temp/*) AND (process_effective_reputation:NOT_LISTED OR process_effective_reputation:UNKNOWN OR process_effective_reputation:ADAPTIVE_WHITE_LIST) AND device_name:"Kirk's Desktop" AND -process_publisher_state:FILE_SIGNATURE_STATE_SIGNED
+
+
+
+Endpoint Standard Kung Fu tip #3 -- AV being blamed for things like blocking files or applications not running properly 
+
+
+It can be helpful for admins and sometimes a necessity to look into something and see if the problem really is something else on the actual OS or other applications. The OS by itself has a lot of "normal" blocks but most people are unaware because they did not have the visibility before a tool like Endpoint Standard. I have found sometimes a search against a host that someone is questioning can be useful and simply search for things like failed or blocked.
+
+failed OR blocked
+
+If you want to drill down a bit more you can search for the keywords along with the hostname to get a smaller subset of data.
+
+failed OR blocked and device_name:"Kirk's Desktop"
+
+Remember if CB Defense blocks something you can normally search for the following.
+
+sensor_action:TERMINATE OR sensor_action:DENY
+
+I hope this will help some folks out who may get in this situation and use the visibility to get greater insight into their environment as a whole.
+
+Endpoint Standard Kung Fu tip #4 -- MSHTA abuse 
+
+Endpoint Standard Kung Fu tip #4 -- MSHTA abuse
+
+
+Today let's have a brief discussion of why and how are things like mshta being abused in the wild? HTA is short for HTML application which consists of HTML and one or more scripting languages supported by IE aka Internet Explorer. An example of this would be something like VBScript or JScript. These type of files are being actively used in the wild as droppers for malware or as part of drive-by web attacks. So why are these type of attacks more difficult to defend against? One of the main reasons is a .hta file type of threat has been successful is because it behaves like a typical executable and runs as a trusted process(mshta.exe) which is signed and a trusted Microsoft file that is being abused in this case.
+
+HTA files have been used as part of drive-by web attacks or droppers for malware in the wild. Using HTA files for web-based attacks against Internet Explorer has proven reliable and successful because an HTA file, when opened in IE, gets launched by mshta.exe which is a signed Microsoft binary allowing you to call PowerShell and inject a payload directly into memory. So by leveraging a trusted process like mshta.exe, attackers can launch files that function as executables meanwhile they then are circumventing application approved policies.
+
+So the question becomes how can we search for these and also then put in some rules that could help protect the environment?
+
+Things to hunt for possibly could be things for mshta's below.
+
+
+mshta establishing network connections
+
+process_name:mshta.exe AND (ttp:NETWORK_ACCESS OR ttp:ATTEMPTED_SERVER OR ttp:ATTEMPTED_CLIENT)
+
+mshta invoking suspicious cmd lines
+process_name:mshta.exe AND (process_cmdline:powershell.exe OR childproc_cmdline:powershell.exe OR process_cmdline:cscript.exe OR childproc_cmdline:cscript.exe OR process_cmdline:wscript.exe OR childproc_cmdline:wscript.exe OR process_cmdline:cmd.exe OR childproc_cmdline:cmd.exe)
+
+Note: If you search in your org and are not using mshta's it would be a good idea may be a good idea to put in some rules for blocking for these. If you do find one you use for example an HP printer you can approve that hash or approve the certificate if signed and block all the rest. Refer to GBB (https://community.broadcom.com/symantecenterprise/discussion/endpoint-standard-achieving-good-better-and-best-policies#bm28c75658-dc1a-41c7-aedd-a7cbf37b8e9b ) if you are not sure how to start this process for ideas for further lockdown.
+
+For example: (You can put in more but you need to see what can be done in your organization)
+Process Operation Attempt Action
+Application(s) at path: **\mshta.exe > Tries to communicate over the network > Terminate operation
+Application(s) at path: **\mshta.exe > Tries to invoke a command interpreter >Terminate operation
+
+Process	Operation Attempt	Action
+Application(s) at path: **\mshta.exe	Tries to communicate over the network	Terminate operation
+Application(s) at path: **\mshta.exe	Tries to invoke a command interpreter	Terminate operation
+
+
+Endpoint Standard Kung Fu tip #5 -- Adding the network component can make a search more useful 
+
+
+
+Today let's have a brief discussion of how looking at information with external network connections can make a normal search much more interesting. Let's look at a few queries that could be interesting and to give you some ideas in your environment.
+
+Fields:
+netconn_inbound:false = Outbound connections
+netconn_inbound:true = Inbound connections
+
+ 
+
+Scheduled tasks making network connections (I am covering multiple scheduled task processes below in this query.)
+
+(parent_name:taskeng.exe OR parent_name:taskhostex.exe OR parent_name:Backgroundtaskhost.exe OR process_name:at.exe OR process_name:schtasks.exe) AND ttp:NETWORK_ACCESS
+
+So the above query would bring scheduled tasks that make a network connection. It may be more interesting based on the sheer amount you would find with a query like that to break it down further. How about we look for scheduled tasks that make an external connection?
+
+Scheduled tasks making external network connections (Hint: take a look at your DHCP scope and exclude all of your internal ranges and you will be left with external connections.)
+
+(parent_name:taskeng.exe OR parent_name:taskhostex.exe OR parent_name:Backgroundtaskhost.exe OR process_name:at.exe OR process_name:schtasks.exe) AND (ttp:NETWORK_ACCESS NOT netconn_ipv4:192.168.*.* OR netconn_ipv4:10.0.*.*) AND netconn_inbound:false
+
+How about something like PowerShell making external connections
+(process_name:POWERSHELL.EXE OR process_name:POWERSHELL_ISE.EXE OR process_name:PWSH.EXE) AND (ttp:NETWORK_ACCESS AND NOT (netconn_ipv4:192.168.*.* OR netconn_ipv4:10.0.*.*)) AND netconn_inbound:false
+
+This should give you some ideas on how to get started. Grab your DHCP scope so you know your subnet ranges and any ranges you don't care to see like for example Office 365 traffic and exclude any you are not interested in and you are left with things that make external connections that may be deemed "interesting" on your pursuit of knowing and locking down your environment.
+
+Endpoint Standard Kung Fu tip #6 -- Looking for NetSh firewall commands that may have ran 
+
+
+Endpoint Standard Kung Fu tip #6 -- Looking for NetSh firewall commands that may have ran 
+Follow 
+ 
+Mar 28, 2019 02:19 PM
+
+Kirk Hasty
+
+Today let's have a brief discussion of why it may be interesting to see if anyone ran any commands to say turn off the Windows firewall for example. I am on vacation so this post is short but could be very useful.
+
+Windows firewall disable command
+(process_cmdline:"NetSh Advfirewall set set all profiles state off" OR process_cmdline:"NetSH Advfirewall set allprofiles state off") OR (childproc_cmdline:"NetSh Advfirewall set set all profiles state off" OR childproc_cmdline:"NetSH Advfirewall set allprofiles state off")
+
+If you just want to see any command that may have run via the NetSh firewall command
+
+process_cmdline:"NetSh Advfirewall" OR childproc_cmdline:"NetSh Advfirewall"
+
+If you want to see any other cool commands you can use the syntax above and change it to one of the commands in the link below to use for ideas.
+
+https://support.microsoft.com/en-us/help/947709/how-to-use-the-netsh-advfirewall-firewall-context-instead-of-the-netsh
+
+Happy firewall hunting.....
+
+Endpoint Standard Kung Fu tip #7 -- Looking for file sharing connections to other systems 
+
+
+Windows supports file and printer sharing traffic by using the Server Message Block (SMB) protocol directly hosted on TCP. The SMB protocol enables “inter-process communication,” using the protocol to allow services and applications to talk/communicate via the network. So we would expect our internal systems like our desktops and laptops to be connected via TCP port 445 to our file server(s), but it may be interesting to exclude those and see what else your systems may be connecting to.
+
+So you would expect to see the destination port of 445 connecting to your file server(s). So hunting for systems in your environment that may be connected to systems other than your file sharing systems(servers) may turn up some potential "interesting" results.
+
+Microsoft File Sharing to systems that are not my file server(s)
+netconn_port:445 AND NOT netconn_ipv4:192.168.1.60                <Note adjust the IP to your server IP>
+
+Now, what if I wanted to look for this but for anything outside of my subnet ranges, which again as in kung fu post 5 grab your ranges in your DHCP scope and look for anything outside of your ranges which will result in external traffic.
+
+netconn_port:445 AND ttp:NETWORK_ACCESS AND NOT (netconn_ipv4:192.168.*.* OR netconn_ipv4:10.0.*.*)
+
+Using (abusing) SMB port 445 is a great conduit to spread malware, bots, and worms. Ideally, you would or already have locked this down in your environment but if not and you find interesting traffic by using these searches below I would suggest blocking TCP/445 at the firewall externally. I would also consider several other rules but of course, you will have some exceptions so if you are interested in taking it to the next level I would refer to this document.
+
+https://support.microsoft.com/en-us/help/3185535/guidelines-for-blocking-specific-firewall-ports-to-prevent-smb-traffic
+
+
+
+Endpoint Standard Kung Fu tip #8 -- Searching for "interesting" things via the threat score 
+
+
+Today let's say you are in the investigate page and you want to do some searching for some "interesting" things in your environment but not sure where to start. You could start by searching for a threat score. So we have threat scores from 1-10 in order of severity. So if you wanted to for example search for something with a 4 you can do a search like this.
+
+Threats with a score of a 4
+event_threat_score:4
+
+Now of course once you bring those back you can filter on any other subset of data you want like say reputation. How about looking for NOT_LISTED files for example.
+
+Threats with a score of 4 and are not listed or unknown when they ran
+event_threat_score:4 AND (process_effective_reputation:NOT_LISTED OR process_effective_reputation:UNKNOWN OR process_effective_reputation:ADAPTIVE_WHITE_LIST)
+
+Next week we will look at combining the field "event_threat_score" with another field to get some more potentially interesting information. Stay tuned....
+
+
+Endpoint Standard Kung Fu tip #9 -- Searching for "interesting" things via the threat score and/or kill chain status 
+
+Let's continue where we left off last week in that we created a query to look for threats with a score of 4 and above. Now, what if we also want to use the kill chain to help us to see how far a possible attack may have gotten in our network.
+
+Let's take a look at how to query for one of the stages in the kill chain status.
+
+Let's query the last stage on the kill chain which is "Execute Goal"
+event_attack_stage:DELIVER_EXPLOIT
+
+So that may be interesting but let's now combine what we learned last week to today's topic with the kill chain.
+
+Threats with a score of 4 and also in the execute goal kill chain phase
+event_attack_stage:DELIVER_EXPLOIT AND event_threat_score:4
+
+Tweak the values above if you get too many results or go through one at a time to gather the information you are looking for.
+
+Endpoint Standard Kung Fu tip #10 -- Using the syslogLevel search string to find or hunt for interesting things 
+Today let's discuss how to search for the field known as syslogLevel in the product. The things you need to know first of course is we have 2 fields that you all know in Endpoint Standard for threats and we classify them as either"Observed" or "Threats".
+
+Observed (formerly "Monitored events" for my old timers)
+alert_category:OBSERVED
+
+Threats
+alert_category:THREAT
+
+Ok so now let's kick this up a notch to get some real value here....
+
+Search for a specific application that generated "Observed events"
+process_name:iexplore.exe AND alert_category:OBSERVED
+
+Search for a specific application that generated "Threat events"
+process_name:iexplore.exe AND alert_category:THREAT
+
+Search for Internet Explorer that generated either an "Observed" or a "Threat" alert
+process_name:iexplore.exe AND (alert_category:OBSERVED OR alert_category:THREAT)
+
+Change the application you are looking for to something besides iexplore.exe. For example, change it to PowerShell and see what interesting activity you may find as well. Until next week practice your kung fu....
+
+Endpoint Standard Kung Fu tip #11 -- Looking for a specific OS or all OS'es 
+
+Sometimes it is helpful to see all Windows machines or Mac machines and what versions they are running. Being able to know this and also by the policy can also be helpful information as well.
+
+Windows Operating system query
+device_os_version:"Windows 7 x64"
+device_os_version:"Windows 7 x86"
+device_os_version:"Windows 10 x64"
+
+Mac Operating system query
+device_os_version:"MAC OS X 10.12.6"
+
+Operating system search
+device_os:WINDOWS
+device_os:MAC
+
+device_os:LINUX
+
+You can, of course, combine these with something like a policy to get the Mac machines in the "Your Standard Policy" if that would be useful search.
+
+Specific OS  version in the company's standard policy (change the policy name to match your policy name)
+device_os_version:"MAC OS X 10.12.6" AND device_policy:"Standard"
+
+Any Mac version in the company's standard policy (change the policy name to match your policy name)
+device_os:MAC AND device_policy:"Standard"
+
+Any Windows version in the company's standard policy (change the policy name to match your policy name)
+device_os:WINDOWS AND device_policy:"Standard"
+
+Until next week practice your kung fu....
+
+Endpoint Standard Kung Fu tip #12 -- Looking for a specific hash 
+
+This week let's say we want to do an investigation of a hash. The question is should I search for the target hash or the parent hash or the selected hash? Well, of course, that answer depends on what you are doing and the particular use case but let's say we have a hash that we want to see anytime it is associated or has run in our environment.
+
+We can use the field 'hash' to look for the given hash to be in any of the application (parent, selected, or target).
+
+Hash search
+hash:7d015b25e54fee4c493181ec9cfd5b54255b80aa5c0e67f93ffceb56c71032dc
+
+
+That search will bring up anywhere that hash has been seen. I can then use the simple Ctrl-F search like on any webpage and look for say the App SHA or Target SHA etc.
+
+
+Endpoint Standard Kung Fu tip #13 -- PowerShell spawning a browser 
+
+
+
+So I saw PowerShell this week invoking a browser in an environment and thought that may be a good simple query to share with folks. That normally should NOT normally be happening. If you have any hits on the queries below it may be good to investigate it.
+
+You can do this one at a time like the below examples
+
+Browser invoking PowerShell
+parent_name:powershell.exe AND childproc_name:iexplore.exe
+parent_name:powershell.exe AND childproc_name:firefox.exe
+parent_name:powershell.exe AND childproc_name:chrome.exe
+
+You can look for all 3 of the major browsers at one time with a search like this below
+
+Powershell invoking one of the major browsers
+parent_name:powershell.exe AND (childproc_name:iexplore.exe OR childproc_name:firefox.exe OR childproc_name:chrome.exe)
+
+If one of the browsers your end users tend to use like Safari just add that to an existing query or Opera etc.
+
+Until next week practice your kung fu....
+
+--------------------------------------------------
+
+Endpoint Standard Kung Fu tip #14 -- Filtering on events with a given event type 
+
+his week let's cover the event types below we can search for. 
+
+Event Types: You can search for any of these below
+
+enriched_event_type:CREATE_PROCESS
+enriched_event_type:DATA_ACCESS
+enriched_event_type:FILE_CREATE
+enriched_event_type:INJECT_CODE
+enriched_event_type:NETWORK
+enriched_event_type:OTHER_BEHAVIOR
+enriched_event_type:POLICY_ACTION
+enriched_event_type:REGISTRY_ACCESS
+enriched_event_type:STATIC_SCAN
+enriched_event_type:SYSTEM_API_CALL
+
+https://developer.carbonblack.com/reference/carbon-black-cloud/cb-defense/latest/platform-search-api-enriched-events/https://developer.carbonblack.com/reference/cb-defense/1/rest-api/#find-events
+
+What if we combined some things to do some "interesting" searches
+
+Not listed or unknown files accessing data
+(process_effective_reputation:NOT_LISTED OR process_effective_reputation:UNKNOWN OR process_effective_reputation:ADAPTIVE_WHITE_LIST) AND enriched_event_type:DATA_ACCESS
+
+Not listed or unknown files touching the registry
+(process_effective_reputation:NOT_LISTED OR process_effective_reputation:UNKNOWN OR process_effective_reputation:ADAPTIVE_WHITE_LIST) AND enriched_event_type:REGISTRY_ACCESS
+
+Of course, if too much data comes back, you can do this by policy or individual host(s) as shown in other kung fu posts.
+
+--------------------------------------------------
+
+Endpoint Standard Kung Fu tip #15 -- Port searching 
+
+
+Let's have a quick discussion on how to search for applications using ports in your environment to add to your kung fu skills.
+
+SSL port or SMB port query
+netconn_port:443 OR netconn_port:445
+
+Let's assume you want to view things that are not using SSL (port 443)
+-netconn_port:443
+
+If you wanted to hunt and see applications that are not using "normal ports," you could do a search like this, for example.
+-(netconn_port:443 OR netconn_port:80 OR netconn_port:53)
+
+
+Pro Tip: Add any other ports you feel are normal in your environment
+
+You can also hunt for things that should run on a known port but are running on a different port which may be deemed "interesting."
+
+Remote Desktop (RDP)
+process_name:mstsc.exe NOT netconn_port:3389
+
+--------------------------------------------------
+
+Endpoint Standard Kung Fu tip #16 -- What is Powershell doing in your network? 
+
+
+esterday I presented at CB Connect 2019, and I showed the audience this blog post I am updating weekly. I am traveling back home today but wanted to get this post out to the folks who heard about the blog yesterday for the first time. I am writing this in the airport lounge so let's get started. I keep this weekly blog going to give a few tips and tricks each week so you can slowly learn more over time and practice a few a week. Today let's take a look for a few PowerShell commands.
+
+If we wanted to see if PowerShell was running Base64 strings we could search for any of the following.
+parent_cmdline:FromBase64String OR process_cmdline:FromBase64String OR childproc_cmdline:FromBase64String
+
+If we want to see if something like PowerShell is invoking expressions or connecting to Github we can run a search like this below.
+process_name:powershell.exe AND (process_cmdline:"iex" OR github*)
+
+If we wanted to look for encoded PowerShell commands being run we could search like this.
+process_name:powershell.exe AND ("EncodedCommand" OR "-enc")
+
+--------------------------------------------------
+
+Endpoint Standard Kung Fu tip #17 -- Are your domain controllers making connections to international sites or your domain admins surfing on a DC? 
+
+ find in many environments that when I hunt with customers that I ask them are your domain admins surfing on the DC's? They should not be and should be doing any internet searches on their desktop or laptop and not on the DC. If you want to check to see if your domain admins are doing this, you can run a query like this.
+
+Searching per the DC hostname
+(process_name:iexplore.exe OR process_name:firefox.exe OR process_name:chrome.exe) AND device_name:"MY DC Name Here"
+
+Searching per the group name field (policy) if you have one
+(process_name:iexplore.exe OR process_name:firefox.exe OR process_name:chrome.exe) AND device_policy:"DC Policy"
+
+Now if you get any hits, we know a domain admin is surfing on the DC. Only a domain admin can be on the DC so now what should we do about that? My recommendation would be to block them from doing that so they don't ever accidentally pull down some potentially malicious on essential boxes in your environment.
+
+You should NEVER see Chrome or Firefox on a DC. You should consider creating a quick string match to block that right off the bat as you are not likely patching chrome or firefox and that adds additional risk on your DC.
+
+Blocking rules
+**\chrome.exe > terminate
+**\firefox.exe > terminate
+
+I would also consider suggesting putting in the same blocking rule for internet explorer as well so that domain admins are forced to go back to their desktop or laptop if they need to do anything on the web.
+**\iexplore.exe > terminate
+
+Another quick thing to check may be your domain controller contacting anything international. If you have DC's around the world this search may not be as, but if you don't, you may want to see what all your machine is communicating to in your environment.
+
+Searching per the DC hostname for applications connecting internationally
+ttp:INTERNATIONAL_SITE AND device_name:"MY DC Name Here"
+
+Searching per the group name field (policy) if you have one for applications connecting internationally
+ttp:INTERNATIONAL_SITE AND device_policy:"DC Policy"
+
+--------------------------------------------------
+
+Endpoint Standard Kung Fu tip #18 -- Adversaries may attempt to try to get a listing of local system or domain accounts using tools that are already on the OS 
+
+What are some tools used to grab domain or local accounts potentially? Today let's focus on 2 in particular in ldifde.exe and csvde.exe
+
+First off, what do these tools do for anyone who may not be familiar?
+
+ldifde.exe
+This utility enables you to import/export information from/to Active Directory. LDIFDE queries any available domain controller to retrieve/update AD information.
+
+csvde.exe
+CSVDE is a command line utility that allows you to import and export, but not to modify or delete, entries into or from a Lightweight Directory Access Protocol (LDAP) repository, such as Active Directory Application Mode (ADAM), Active Directory Lightweight Directory Services (AD LDS), Active Directory, or Active Directory Domain Services (AD DS).
+
+How can we look to see if Microsoft utilities like the ones mentioned above may be running in our environment? First, let's check if either tool is used in the background.
+process_name:ldifde.exe OR process_name:csvde.exe
+
+If the applications mentioned above are running in your company, are there any network connections happening as well, which might mean someone is remotely trying to grab credentials?
+(process_name:ldifde.exe OR process_name:csvde.exe) AND ttp:NETWORK_ACCESS
+
+If you find you are not using these tools in your environment or want to block these type of tools, you can create simple rules like this below to block them.
+
+The recommendation is that customers need to test these rules before deploying enterprise-wide.
+
+For example: (You can put in more, but you need to see what can be done in your organization). You can block all activity or just block the network communication piece.
+
+Application(s) at path: **\ldifde.exe > Communicates over the network > Deny operation
+Application(s) at path: **\csvde.exe > Communicates over the network > Deny operation
+
+Blocking the executables from running at all
+
+Application(s) at path: **\ldifde.exe > Tries to run or is running > Terminate operation
+Application(s) at path: **\csvde.exe > Tries to run or is running >Terminate operation
+
+Endpoint Standard Kung Fu tip #19 -- Using a wildcard in your searches 
+
+ have been asked the question enough by customers that I figured a quick blog post on it may help some folks. The question is, "Can you search and use wildcards?"
+
+The answer is yes, but there are some things to know about this.
+
+A few things to be aware of below:
+
+*****************************************
+
+Leading wildcard queries are not currently supported.
+
+Trailing asterisk: Add to searches of more than three characters to include results that match that phrase with any combination of characters in place of the asterisk.
+
+*****************************************
+
+So can we use a wildcard to save us some typing or bring back "interesting things."
+
+For example, if I want to find matches on program files, program files (x86) or just anything with the word program in it I can search for the below one.
+Program*
+
+You can also search via a TTP search for all TTP's that have the word "KNOWN" in them.
+
+KNOWN_DROPPER
+KNOWN_KEYLOGGER
+KNOWN_PASSWORD_STEALER
+KNOWN_RANSOMWARE
+KNOWN_ROGUE
+KNOWN_ROOTKIT
+KNOWN_WORM
+
+We could look for each one and type them out or use a wildcard
+ttp:KNOWN_*
+
+We can combine TTP searches as well like this to find any TTP with the word RUN or KNOWN in them.
+ttp:RUN_* OR ttp:KNOWN_*
+
+Practice your kung fu until next week...
+
+--------------------------------------------------
 
