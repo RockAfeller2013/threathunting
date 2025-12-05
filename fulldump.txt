@@ -1,0 +1,3218 @@
+Sensor Analysis
+Active Sensor Policies
+Schedule
+Description:
+See every policy running on the sensor.
+Results:
+Lists policies running on the sensor, such as ASMI, DRE, and console-defined policies. Console-defined policies include the policy name and time stamp.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM cb_sensor_status
+WHERE category='Rules'
+  OR (category='General'
+      AND name='LastManifestContentUpdate')
+  OR (category='General'
+      AND name='DefenseEnabled')
+  OR (category='General'
+      AND name='PolicyName')
+  OR (category='General'
+      AND name='PolicyTimestamp');
+Edit SQL
+Sensor Analysis
+AMSI Status
+Schedule
+Description:
+Detect devices with AMSI disabled.
+Results:
+Lists device and AMSI status.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM cb_sensor_configprops
+WHERE name='AmsiEnabled'
+  AND value='0';
+Edit SQL
+Compliance
+Authorized SSH Keys
+Schedule
+Description:
+The Authorized_keys file for SSH is a critical file that controls which users can log into which systems.
+Results:
+Lists all relevant information about the authorized keys on the target systems.
+Carbon Black recommends that you run this query daily
+
+SELECT *
+FROM users
+JOIN authorized_keys USING (UID);
+Edit SQL
+IT Hygiene
+AWS EC2 Instance Tags
+Schedule
+Description:
+See the AWS EC2 instance tags on your Linux servers.
+Results:
+Lists instance ID, key, and value.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM ec2_instance_tags;
+Edit SQL
+IT Hygiene
+AWS EC2 Metadata Information
+Schedule
+Description:
+Instance metadata allows you to configure or manage your running EC2 instance.
+Results:
+Lists AWS EC2 Metadata information on your Linux servers.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM ec2_instance_metadata;
+Edit SQL
+Sensor Analysis
+Background Scan Status
+Schedule
+Description:
+Detect the current status of sensor background scans.
+Results:
+Lists device, background scan status, and current progress (if incomplete).
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE category='BackgroundScan'
+  AND name='BackgroundScanState'
+  OR name='BackgroundScanProgress';
+Edit SQL
+IT Hygiene
+Binaries with SUID or SGID Set
+Schedule
+Description:
+When the Set User ID (SUID) flag is set on an executable file, the executable runs with the effective uid of the file owner. These binaries could be used to run unauthorized code as root. You should audit and limit which binaries have this flag, to avoid attacks such as privilege escalation.
+Results:
+List binaries on a macOS or Linux system that have the SUID or SGID flags set and is world executable.
+Carbon Black recommends that you run this query daily
+
+SELECT PATH,
+       username,
+       groupname,
+       permissions,
+       datetime(atime, "unixepoch", "localtime") AS atime,
+       datetime(ctime, "unixepoch", "localtime") AS ctime,
+       datetime(mtime, "unixepoch", "localtime") AS mtime,
+       sha256
+FROM suid_bin
+JOIN HASH USING(PATH)
+JOIN FILE USING(PATH)
+WHERE MODE GLOB "???5";
+Edit SQL
+Compliance
+BitLocker Configuration Details
+Schedule
+Description:
+Bitlocker is a Windows feature that encrypts your volume drive.
+Results:
+Details on the BitLocker status for target systems, such as device ID, conversion status, and encryption method.
+Carbon Black recommends that you run this query weekly
+
+SELECT drive_letter,
+       CASE protection_status
+           WHEN 0 THEN "OFF"
+           WHEN 1 THEN "ON (Unlocked)"
+           WHEN 2 THEN "ON (Locked)"
+       END "Bitlocker Status"
+FROM bitlocker_info;
+Edit SQL
+IT Hygiene
+Blank Passwords Enabled
+Schedule
+Description:
+Checks for the value of the 'LimitBlankPasswordUse' registry key. The value of the key should be 1, which prevents network connections from accessing the endpoint using a blank password. Learn more: https://www.stigviewer.com/stig/windows_10/2019-01-04/finding/V-63617
+Results:
+Returns "Blank Password Auth via Network Possible" or "Blank Password Auth via Network Not Possible". If “possible” is returned, change the 'LimitBlankPasswordUse' registry key value to 1.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE
+           WHEN EXISTS
+                  (SELECT DATA
+                   FROM registry
+                   WHERE PATH="HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\LimitBlankPasswordUse"
+                     AND DATA=1) THEN "Blank Password Auth via Network Not Possible"
+           ELSE "Blank Password Auth via Network Possible"
+       END "Limit Blank Password Use";
+Edit SQL
+Sensor Analysis
+Block and Terminate Statistics
+Schedule
+Description:
+View information about blocks since the last sensor restart.
+Results:
+Lists the type and number of blocks.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_counters
+WHERE name LIKE 'Rules:Blocked%'
+  OR name LIKE 'Rules:Terminate%'
+  OR name LIKE '%Callback:Blocked%'
+  OR name LIKE '%Callback:Terminate%'
+  OR name LIKE '%:Amsi:EventsBlocked%'
+  OR name LIKE '%:Priority Block%'
+  OR name LIKE '%:Priority Terminate%';
+Edit SQL
+Sensor Analysis
+Canary File Information
+Schedule
+Description:
+Collect and view information about canary files managed by the CBC Windows sensor. Requires Carbon Black Cloud Windows sensor versions 3.9+.
+Results:
+Lists the name, size, and creation time associated with canary files.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       file_size,
+       file_creation_time
+FROM cb_sensor_canaries;
+Edit SQL
+Sensor Analysis
+CbDisk.sys Status
+Schedule
+Description:
+Detect if CbDisk.sys isn't loaded (indicating no reboot since initial install of 3.7+). If so, the sensor will be missing certain ransomware prevention capabilities.
+Results:
+Lists device and responds with "Not Matched" if CbDisk.sys is loaded.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE category='Version'
+  AND name='DiskFilterVersion'
+  AND value LIKE 'Unknown';
+Edit SQL
+Vulnerability Management
+Chrome Extensions
+Schedule
+Description:
+Discover Chrome-based browser extensions for all users on a target system. Learn more: https://attack.mitre.org/techniques/T1176/
+Results:
+Lists extension information such as UID, version, locale, and other data.
+Carbon Black recommends that you run this query as needed
+
+SELECT username,
+DIRECTORY,
+       shell,
+       TYPE,
+       name,
+       VERSION,
+       locale,
+       update_url,
+       author,
+       persistent,
+       PATH
+FROM users
+JOIN chrome_extensions USING (UID);
+Edit SQL
+Threat Hunting
+Cleared Event Logs (UPDATED)
+Schedule
+Description:
+Searches the Security event log for cleared event entries indicating that event logs have been cleared. Learn more: https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventid=1102
+Results:
+If any entries are located where the event ID is 1102, indicating that that logs have been cleared, the results will provide the date and time this action was taken as well as responsible account.
+Carbon Black recommends that you run this query as needed
+
+SELECT datetime,
+       json_extract(DATA, '$.UserData.LogFileCleared.SubjectDomainName') AS DOMAIN,
+       json_extract(DATA, '$.UserData.LogFileCleared.SubjectUserName') AS USER,
+       json_extract(DATA, '$.UserData.LogFileCleared.SubjectUserSid') AS sid
+FROM windows_eventlog
+WHERE channel = 'Security'
+  AND eventid = '1102';
+Edit SQL
+Threat Hunting
+CPU Time (UPDATED)
+Schedule
+Description:
+To understand process utilization, examine problematic applications, or look for indicators of attack such as cryptomining.
+Results:
+Looks for the top 10 most CPU intensive processes.
+Carbon Black recommends that you run this query as needed
+
+SELECT pid,
+       UID,
+       name,
+       ROUND(((user_time + system_time) / (cpu_time.tsb - cpu_time.itsb)) * 100, 2) AS percentage
+FROM processes,
+
+  (SELECT (SUM(USER) + SUM(nice) + SUM(SYSTEM) + SUM(idle) * 1.0) AS tsb,
+          SUM(COALESCE(idle, 0)) + SUM(COALESCE(iowait, 0)) AS itsb
+   FROM cpu_time) AS cpu_time
+ORDER BY user_time+system_time DESC
+LIMIT 10;
+Edit SQL
+IT Hygiene
+Credential Theft Hardening - LSASS
+Schedule
+Description:
+In Windows 8, 10, and 2012 R2 operating systems, credential theft tools (such as Mimikatz) can extract passwords and hashes from the Local Security Authority Server Service (LSASS) process if it is not protected by enabling the RunAsPPL registry key. Learn more: https://attack.mitre.org/techniques/T1003/
+Results:
+Query returns DISABLED if the target systems has RunAsPPL disabled. CB recommends deploying this IT Hygiene policy via GPO to protect against credential theft. If no results are returned, the machine has this credential theft mitigation in place.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE cnt
+           WHEN 0 THEN "DISABLED"
+       END "LSA Protection"
+FROM
+  (SELECT DATA,
+          COUNT(PATH) AS cnt
+   FROM registry
+   WHERE PATH = 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa\RunAsPPL'
+     AND DATA = 1)
+WHERE cnt = 0;
+Edit SQL
+IT Hygiene
+Credential Theft Hardening - WDigest (UPDATED)
+Schedule
+Description:
+On Windows XP and later operating systems, credential theft tools (such as Mimikatz) can access the WDigest protocol that sends plain text credentials to certain applications. By default, Windows stores these credentials in the lsass.exe process for user convenience. This protocol should be disabled. Learn more: https://attack.mitre.org/techniques/T1003/
+Results:
+Lists the status for WDigest for all systems, which should be in a disabled state. If systems have WDigest enabled then Carbon Black recommends conducting an immediate investigation.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE
+           WHEN DATA = '0' THEN 'DISABLED'
+           WHEN DATA = '1' THEN 'ENABLED'
+       END 'wdigest_status'
+FROM registry
+WHERE KEY = 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest'
+  AND (name = 'Negotiate'
+       OR name = 'UserLogonCredential');
+Edit SQL
+Sensor Analysis
+CRL Check Status
+Schedule
+Description:
+Detect devices with Certificate Revocation List (CRL) check for sensor communications disabled.
+Results:
+Lists devices with CRL check disabled in configuration properties.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_configprops
+WHERE name='CurlCrlCheck'
+  AND value='0';
+Edit SQL
+Sensor Analysis
+Curl Connection Information
+Schedule
+Description:
+Review information about curl requests made by the CBC Windows sensor to validate connectivity. This can help diagnose intermittent connectivity issues or provide insight into sensor network activities. Requires Carbon Black Cloud Windows sensor versions 3.9+.
+Results:
+Lists URL, HTTP status, protocol, cert information, encryption algorithm, proxy information, and other curl-returned session data.
+Carbon Black recommends that you run this query as needed
+
+WITH BES AS
+  (SELECT value
+   FROM cb_sensor_configprops
+   WHERE name='BackendServer')
+SELECT *
+FROM cb_sensor_curl
+WHERE url='https://' ||
+    (SELECT value
+     FROM BES) || '/services/healthCheck';
+Edit SQL
+Sensor Analysis
+Current Sensor Version
+Schedule
+Description:
+See every device and its current sensor version.
+Results:
+Lists device, sensor version, sensor disk filter version, and installation time.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE category='Version'
+  AND name='DiskFilterVersion'
+  OR name='SensorVersion';
+Edit SQL
+Vulnerability Management
+CVE-2019-18634 Vulnerability
+Schedule
+Description:
+CVE-2019-18634 - sudo 1.7.1 <= version < 1.8.26 is vulnerable when pwfeedback is set. An overflow in sudo allows the attacker to gain root. This query searches for hosts with vulnerable versions of sudo that also have the pwfeedback option set. This option is not-standard for most distributions. This query supports both rpm and deb based distros.Warning - This is a CPU intensive query and should be run with a low frequency. The query may result in false-positives if distros backport the patch as sudo < 1.8.31. Learn more: https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-18634
+Results:
+Returns rows containing (NAME) sudo, version number (VERSION) and whether the pwfeedback options is configured (VULNERABLE_CONFIG_SET). Hosts matching this query are vulnerable to CVE-2019-18634.
+Carbon Black recommends that you run this query as needed
+
+SELECT package.name,
+       package.version,
+       package.release,
+       cast(split(package.version, ".", 0) AS int) AS major,
+       cast(split(package.version, ".", 1) AS int) AS minor,
+       cast(split(package.version, ".", 2) AS int) AS patch,
+       sudoers.label AS vulnerable_config_set
+FROM
+  (SELECT name,
+          VERSION,
+          release
+   FROM rpm_packages
+   UNION SELECT name,
+                VERSION,
+                SOURCE
+   FROM deb_packages) AS PACKAGE,
+
+  (SELECT *
+   FROM augeas
+   WHERE (PATH IN
+            (SELECT PATH
+             FROM FILE
+             WHERE PATH like '/etc/sudoers.d/%')
+          OR PATH = '/etc/sudoers')
+     AND label='pwfeedback') AS sudoers
+WHERE package.name = 'sudo'
+  AND major = 1
+  AND minor BETWEEN 7 AND 8
+  AND patch < 31
+LIMIT 1;
+Edit SQL
+Threat Hunting
+CVE-2021-26857 - Search the Exchange Application logs for Invalid Cast Exceptions
+Schedule
+Description:
+Live Query based on suggested Microsoft PowerShell for inspecting logs for attacks against these CVEs https://www.microsoft.com/security/blog/2021/03/02/hafnium-targeting-exchange-servers/ If there is a match on an Exchange Server, analysts should conduct further investigation according to the Microsoft guidance. Learn more: https://community.carbonblack.com/t5/Threat-Research-Docs/Microsoft-Exchange-0-Days-CVE-2021-26855-CVE-2021-26857-CVE-2021/ta-p/101318
+Results:
+This query uses yara to determine if there is a pattern match for CVE-2021-27065 within the Application/MSExchange Unified Messaging EventLog.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM windows_eventlog
+WHERE channel = 'Application'
+  AND provider_name = 'MSExchange Unified Messaging'
+  AND LEVEL = 2
+  AND DATA LIKE '%System.InvalidCastException%';
+Edit SQL
+Threat Hunting
+CVE-2021-26858 - Searching the Exchange OAB Generator log with Yara
+Schedule
+Description:
+Live Query based on suggested Microsoft PowerShell for inspecting logs for attacks against these CVEs https://www.microsoft.com/security/blog/2021/03/02/hafnium-targeting-exchange-servers/ If there is a match on an Exchange Server, analysts should conduct further investigation according to the Microsoft guidance. Learn more: https://community.carbonblack.com/t5/Threat-Research-Docs/Microsoft-Exchange-0-Days-CVE-2021-26855-CVE-2021-26857-CVE-2021/ta-p/101318
+Results:
+This query uses yara to determine if there is a pattern match in Program Files\Microsoft\Exchange Server\V15\Logging\OABGeneratorLog\% for behavior related to CVE-2021-27065.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM yara
+WHERE sigrule = from_base64('cnVsZSAgQ1ZFLTIwMjEtMjY4NTggewp7CiBtZXRhOgogIGF1dGhvciA9ICJUQVUiCiBzdHJpbmdzOgogICRzMSA9ICJEb3dubG9hZCBmYWlsZWQgYW5kIHRlbXBvcmFyeSBmaWxlIiBhc2NpaSB3aWRlCiBjb25kaXRpb246CiAgYWxsIG9mIHRoZW0KfQo=')
+  AND matches > 1
+  AND PATH LIKE 'C:\Program Files\Microsoft\Exchange Server\V15\Logging\OABGeneratorLog\%';
+Edit SQL
+Threat Hunting
+CVE-2021-27065 - Searching the Exchange ECP log with Yara
+Schedule
+Description:
+Live Query based on suggested Microsoft PowerShell for inspecting logs for attacks against these CVEs https://www.microsoft.com/security/blog/2021/03/02/hafnium-targeting-exchange-servers/ If there is a match on an Exchange Server, analysts should conduct further investigation according to the Microsoft guidance. Learn more: https://community.carbonblack.com/t5/Threat-Research-Docs/Microsoft-Exchange-0-Days-CVE-2021-26855-CVE-2021-26857-CVE-2021/ta-p/101318
+Results:
+This query uses yara to determine if there is a pattern match within Program Files\Microsoft\Exchange Server\V15\Logging\ECP\Server\%.log for behavior related to CVE-2021-27065.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM yara
+WHERE sigrule = from_base64('cnVsZSAgQ1ZFLTIwMjEtMjcwNjUgeyAKIG1ldGE6CiAgYXV0aG9yID0gIlRBVSIKIHN0cmluZ3M6CiAgJHMxID0gL1NldC0uK1ZpcnR1YWxEaXJlY3RvcnkvCiBjb25kaXRpb246CiAgYWxsIG9mIHRoZW0KfQ==')
+  AND matches > 1
+  AND PATH like 'C:\Program Files\Microsoft\Exchange Server\V15\Logging\ECP\Server\%.log';
+Edit SQL
+Sensor Analysis
+Debug Logging Status
+Schedule
+Description:
+Detect devices with increased logging levels (typically due to troubleshooting).
+Results:
+Lists devices with debug logging enabled.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE category='Diagnostic'
+  AND name='DebuggingEnabled'
+  AND value LIKE 'True'
+UNION ALL
+SELECT name,
+       value
+FROM cb_sensor_configprops
+WHERE name='VerboseLogPattern'
+  AND value!=''
+  AND is_kernel_configprop='1';
+Edit SQL
+IT Hygiene
+Dell SafeBIOS Verification Status
+Schedule
+Description:
+Reports the BIOS verification status for supported Dell platforms running Windows 10 (Latitude, OptiPlex, Precision, and select XPS). Learn more: https://www.dell.com/support/manuals/us/en/04/trusted-device/trusted_device/introduction
+Results:
+Displays the BIOS verification status for Dell endpoints running the Dell Trusted Device agent (PASSED, FAILED, or NOT AVAILABLE). Carbon Black recommends policy hardening, quarantine of endpoints that display a FAILED status, or further investigation via Live Response.
+Carbon Black recommends that you run this query daily
+
+WITH b1 AS
+  (SELECT COUNT(*) AS cnt,
+          1 AS one
+   FROM registry
+   WHERE PATH LIKE 'HKEY_LOCAL_MACHINE\SOFTWARE\DELL\BIOSVerification\%'
+     AND name = 'Result.json'
+     AND DATA LIKE '%"biosVerification":"True"%'),
+     b2 AS
+  (SELECT COUNT(*) AS cnt,
+          1 AS one
+   FROM registry
+   WHERE PATH LIKE 'HKEY_LOCAL_MACHINE\SOFTWARE\DELL\BIOSVerification\%'
+     AND name = 'Result.json'
+     AND DATA LIKE '%"biosVerification":"False"%'),
+     b3 AS
+  (SELECT COUNT (*) AS cnt,
+                1 AS one
+   FROM FILE
+   WHERE PATH LIKE '\Program Files\Dell\TrustedDevice\Dell.TrustedDevice.Service.Console.exe'),
+     b4 AS
+  (SELECT COUNT (*) AS cnt,
+                1 AS one
+   FROM FILE
+   WHERE PATH like '\Program Files\Dell\BIOSVerification\Dell.SecurityCenter.Agent.Console.exe'),
+     b5 AS
+  (SELECT count(*),
+          VERSION,
+          1 AS one
+   FROM programs
+   WHERE name LIKE '%BIOS Verification%'
+     OR name LIKE '%trusted device%'),
+     b6 AS
+  (SELECT hardware_vendor,
+          hardware_model,
+          1 AS one
+   FROM system_info),
+     b7 AS
+  (SELECT count(*),
+          DATETIME(mtime, 'unixepoch') AS mtime,
+          1 AS one
+   FROM FILE
+   WHERE PATH = 'C:\ProgramData\Dell\BIOSVerification\result.json')
+SELECT CASE
+           WHEN b1.cnt = 1 THEN "PASSED"
+           WHEN b2.cnt = 1 THEN "FAILED"
+           WHEN (b1.cnt = 0
+                 AND b2.cnt = 0) THEN "NOT AVAILABLE"
+       END "BIOS_verification_status",
+       CASE
+           WHEN b3.cnt = 1 THEN "TRUE"
+           WHEN b4.cnt = 1 THEN "TRUE"
+           WHEN (b3.cnt = 0
+                 AND b4.cnt = 0) THEN "FALSE"
+       END "Dell_TD_installed",
+       CASE
+           WHEN b5.version IS NOT NULL THEN b5.version
+           WHEN b5.version IS NULL THEN "N/A"
+       END "Dell_TD_version",
+       CASE
+           WHEN b6.hardware_vendor like 'Dell%' THEN b6.hardware_model
+           WHEN b6.hardware_vendor not like 'Dell%' THEN "UNSUPPORTED"
+       END "HARDWARE_MODEL",
+       CASE
+           WHEN b7.mtime IS NOT NULL THEN b7.mtime
+           WHEN b7.mtime IS NULL THEN "NOT AVAILABLE"
+       END "LAST_RUNTIME"
+FROM b1
+JOIN b2 USING(one)
+JOIN b3 USING(one)
+JOIN b4 USING(one)
+JOIN b5 USING(one)
+JOIN b6 USING(one)
+JOIN b7 USING(one)
+WHERE b6.hardware_vendor like 'Dell%';
+Edit SQL
+Threat Hunting
+Detect Potential Reverse Shells
+Schedule
+Description:
+Attackers can use open network sockets from sh or bash processes to implement the command and control tactic via their machine, or Reverse Shell, and control systems in a target network. Learn more: https://attack.mitre.org/tactics/TA0011/
+Results:
+Lists any processes that have open sockets, which should be immediately investigated, especially if they are external destinations.
+Carbon Black recommends that you run this query daily
+
+SELECT DISTINCT(processes.pid),
+       processes.parent,
+       processes.name,
+       processes.path,
+       processes.cmdline,
+       processes.cwd,
+       processes.root,
+       processes.uid,
+       processes.gid,
+       processes.start_time,
+       process_open_sockets.remote_address,
+       process_open_sockets.remote_port,
+
+  (SELECT cmdline
+   FROM processes AS parent_cmdline
+   WHERE pid=processes.parent) AS parent_cmdline
+FROM processes
+JOIN process_open_sockets USING (pid)
+LEFT OUTER JOIN process_open_files ON processes.pid = process_open_files.pid
+WHERE (name='sh'
+       OR name='bash')
+  AND remote_address NOT IN ('0.0.0.0',
+                             '::',
+                             '');
+Edit SQL
+Threat Hunting
+Detect sdelete.exe Execution
+Schedule
+Description:
+Sdelete.exe has been used by attackers to securely erase data on endpoints.
+Results:
+A result for this query is an indicator that sdelete.exe was run on the endpoint along with the modified, accessed, and created dates. The modified date would be the last time this process was run.
+Carbon Black recommends that you run this query as needed
+
+SELECT filename,
+       datetime(atime, "unixepoch", "localtime") AS atime,
+       datetime(ctime, "unixepoch", "localtime") AS ctime,
+       datetime(mtime, "unixepoch", "localtime") AS mtime
+FROM FILE
+WHERE PATH LIKE "\Windows\prefetch\sdelete.exe%";
+Edit SQL
+IT Hygiene
+Discover Open TCP Docker API Sockets
+Schedule
+Description:
+Check dockerd listening ports to discover open TCP API sockets. The default configuration is local unix sockets. Network Docker API sockets can be attack targets, and should receive additional firewall, encryption, and authentication protection. See also: https://docs.docker.com/engine/security/security/#docker-daemon-attack-surface
+Results:
+Lists details of open ports related to the dockerd process.
+Carbon Black recommends that you run this query weekly
+
+SELECT l.port,
+       l.address,
+       p.pid,
+       p.path,
+       p.cmdline
+FROM listening_ports AS l
+LEFT JOIN processes p ON p.pid=l.pid
+WHERE p.path LIKE '%dockerd%'
+  AND port!=0
+  AND address != '127.0.0.1';
+Edit SQL
+IT Hygiene
+EternalBlue Hardening
+Schedule
+Description:
+EternalBlue is a critical vulnerability that allows attackers to modify files and services on a network if systems do not have the Windows XP patch or if they have SMBv1 disabled. Disabling SMBv1 can break legacy printers and Linux Samba systems. Learn more: https://attack.mitre.org/techniques/T1211/
+Results:
+Lists SMBv1 Server Status as ENABLED, DISABLED OR UNDETERMINED. If ENABLED, CB recommends deploying this IT Hygiene policy via GPO to disable SMBv1 and protect against attacker exploits.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE
+           WHEN method.fetch_method == 'REGISTRY' THEN
+                  (SELECT CASE cnt
+                              WHEN 0 THEN "ENABLED"
+                              ELSE "DISABLED"
+                          END
+                   FROM
+                     (SELECT count(name) AS cnt
+                      FROM registry
+                      WHERE PATH='HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters\\SMB1'
+                        AND DATA = 0))
+           WHEN method.fetch_method == 'FEATURE' THEN
+                  (SELECT CASE
+                              WHEN features.statename == 'Enabled' THEN 'ENABLED'
+                              ELSE 'DISABLED'
+                          END
+                   FROM windows_optional_features features
+                   WHERE name == 'SMB1Protocol')
+           ELSE 'UNDETERMINED'
+       END "SMBv1 Status"
+FROM
+  (SELECT CASE
+              WHEN ((os.major == 10)
+                    OR (os.major == 6
+                        AND os.minor == 3)) THEN 'FEATURE'
+              WHEN ((os.major == 6))
+                   AND (os.minor == 3) THEN 'FEATURE'
+              WHEN ((os.major == 6)
+                    AND (os.minor == 0
+                         OR os.minor == 1)) THEN 'REGISTRY'
+              ELSE 'UNDETERMINED'
+          END "fetch_method"
+   FROM os_version AS os
+   WHERE os.platform = 'windows') AS METHOD;
+Edit SQL
+Threat Hunting
+Failed RDP Logon - Security event log (UPDATED)
+Schedule
+Description:
+Searches the Security event log for entries indicating unsuccessful RDP activity. Learn more: https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventid=4625
+Results:
+If any entries are located where the event ID is 4625 and the logon type is 10 or 3 (for NLA), indicating an unsuccessful RDP logon, the results will provide the date and time of this connection attempt, eventid, sid, username, encoded and decoded failure reason, encoded and decoded logon type, IP address, and the port.
+Carbon Black recommends that you run this query as needed
+
+SELECT datetime,
+       eventid,
+       json_extract(windows_eventlog.data, '$.EventData.TargetUserSid') AS 'sid',
+       json_extract(windows_eventlog.data, '$.EventData.TargetUserName') AS 'username',
+       json_extract(windows_eventlog.data, '$.EventData.SubStatus') AS 'failure_reason',
+       CASE json_extract(windows_eventlog.data, '$.EventData.SubStatus')
+           WHEN lower('0xC0000064') THEN 'user name does not exist'
+           WHEN lower('0xC000006A') THEN 'user name is correct but the password is wrong'
+           WHEN lower('0xC0000234') THEN 'user is currently locked out'
+           WHEN lower('0xC0000072') THEN 'account is currently disabled'
+           WHEN lower('0xC000006D') THEN 'reason not specified'
+           WHEN lower('0xC000006F') THEN 'user tried to logon outside his day of week or time of day restrictions'
+           WHEN lower('0xC0000070') THEN 'workstation restriction'
+           WHEN lower('0xC0000193') THEN 'account expiration'
+           WHEN lower('0xC0000071') THEN 'expired password'
+           WHEN lower('0xC0000133') THEN 'clocks between DC and other computer too far out of sync'
+           WHEN lower('0xC0000224') THEN 'user is required to change password at next logon'
+           WHEN lower('0xC0000225') THEN 'evidently a bug in Windows and not a risk'
+       END 'failure_status_description',
+           json_extract(windows_eventlog.data, '$.EventData.LogonType') AS 'logon_type',
+           CASE json_extract(windows_eventlog.data, '$.EventData.LogonType')
+               WHEN '2' THEN 'INTERACTIVE'
+               WHEN '3' THEN 'NETWORK'
+               WHEN '4' THEN 'BATCH'
+               WHEN '5' THEN 'SERVICE'
+               WHEN '7' THEN 'UNLOCK'
+               WHEN '8' THEN 'NETWORK_CLEAR_TEXT'
+               WHEN '9' THEN 'NEW_CREDENTIALS'
+               WHEN '10' THEN 'REMOTE_INTERACTIVE'
+               WHEN '11' THEN 'CACHED_INTERACTIVE'
+           END 'logon_type_description',
+               json_extract(windows_eventlog.data, '$.EventData.IpAddress') AS 'ip_address',
+               json_extract(windows_eventlog.data, '$.EventData.IpPort') AS 'ip_port'
+FROM windows_eventlog
+WHERE channel = 'Security'
+  AND eventid ='4625'
+  AND (DATA like '%"LogonType":"3"%'
+       OR DATA like '%"LogonType":"10"%');
+Edit SQL
+Threat Hunting
+Find potential reverse shell or TTY abuse
+Schedule
+Description:
+This query searches for socat or scripting connections to TTYs as non-root users. There may be cases of sysadmins using socat for legitimate reasons, but this should be rare. POC exploit for CVE-2019-18634 here- https://github.com/Plazmaz/CVE-2019-18634 . Other examples of scripts connecting to ptys are shown here- http://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet . Learn more: https://community.carbonblack.com/t5/Query-Exchange/Find-potential-reverse-shell-or-TTY-abuse/idi-p/86008
+Results:
+Returns rows that could indicate reverse shells or other abuse.
+Carbon Black recommends that you run this query as needed
+
+SELECT DISTINCT processes.pid,
+                processes.path,
+                processes.cmdline,
+                processes.parent,
+                processes.pgroup,
+                processes.uid
+FROM processes
+INNER JOIN process_open_files ON process_open_files.pid = processes.pid
+WHERE (process_open_files.path IN ('/dev/ptmx',
+                                   '/dev/tty')
+       OR process_open_files.path LIKE '/dev/pts/%')
+  AND processes.name IN ('socat',
+                         'python',
+                         'python2',
+                         'python3',
+                         'perl',
+                         'php',
+                         'ruby');
+Edit SQL
+Vulnerability Management
+Find systems with Windows Subsystem for Linux (WSL) enabled
+Schedule
+Description:
+This query looks for Windows endpoints with WSL feature enabled. Learn more: https://community.carbonblack.com/t5/Query-Exchange/Windows-with-WSL-enabled/idi-p/107349
+Results:
+Returns a list of endpoints with WSL enabled.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM windows_optional_features
+WHERE name = 'Microsoft-Windows-Subsystem-Linux'
+  AND state = 1;
+Edit SQL
+Compliance
+Free Disk Space on Linux/macOS
+Schedule
+Description:
+Discover the free space that is available on root volumes, including partitions.
+Results:
+Lists all root partitions and available free space.
+Carbon Black recommends that you run this query as needed
+
+SELECT printf('%.2f', ((blocks-blocks_available*1.0)*blocks_size)/1073741824) AS used_space_gb,
+       printf('%.2f',(1.0 * blocks_available * blocks_size / 1073741824)) AS space_left_gb,
+       printf('%.2f',(1.0 * blocks * blocks_size / 1073741824)) AS total_space_gb,
+       printf('%.2f', (((blocks-blocks_available*1.0)*blocks_size)/1073741824)/(1.0 * blocks * blocks_size / 1073741824)) * 100 AS '%_used',
+       printf('%.2f', (1.0 * blocks_available * blocks_size / 1073741824)/(1.0 * blocks * blocks_size / 1073741824)) * 100 AS '%_free'
+FROM mounts
+WHERE PATH = '/';
+Edit SQL
+Sensor Analysis
+High Service CPU
+Schedule
+Description:
+Detect devices that have exceeded the threshold for sensor service CPU usage and generated alarms in sensor logs.
+Results:
+Lists device, CPU threshold, and number of alarms.
+Carbon Black recommends that you run this query as needed
+
+WITH isAlarmTriggered AS
+  (SELECT name,
+          value
+   FROM cb_sensor_status
+   WHERE category='Alarms'
+     AND name='ServiceCPUHigh')
+SELECT *
+FROM isAlarmTriggered
+UNION ALL
+SELECT name,
+       value
+FROM cb_sensor_configprops
+WHERE name='AlarmThresholdForServiceCPUUsage'
+  AND EXISTS
+    (SELECT *
+     FROM isAlarmTriggered);
+Edit SQL
+Sensor Analysis
+High System CPU
+Schedule
+Description:
+Detect devices that have exceeded the threshold for system CPU usage and generated alarms in sensor logs.
+Results:
+Lists device, CPU threshold, and number of alarms.
+Carbon Black recommends that you run this query as needed
+
+WITH isAlarmTriggered AS
+  (SELECT name,
+          value
+   FROM cb_sensor_status
+   WHERE category='Alarms'
+     AND name='SystemCPUHigh')
+SELECT *
+FROM isAlarmTriggered
+UNION ALL
+SELECT name,
+       value
+FROM cb_sensor_configprops
+WHERE name='AlarmThresholdForSystemCPUUsage'
+  AND EXISTS
+    (SELECT *
+     FROM isAlarmTriggered);
+Edit SQL
+Sensor Analysis
+Insecure Authenticated RepCLI Users
+Schedule
+Description:
+Detect devices that were configured for authenticated RepCLI usage with a SID value that maps to a non-admin user.
+Results:
+Lists configured devices and the non-admin user's SID value.
+Carbon Black recommends that you run this query as needed
+
+WITH isAlarmTriggered AS
+  (SELECT name,
+          value
+   FROM cb_sensor_status
+   WHERE category='Alarms'
+     AND name='InsecureAuthenticatedCLIUsers')
+SELECT *
+FROM isAlarmTriggered
+UNION ALL
+SELECT name,
+       value
+FROM cb_sensor_configprops
+WHERE name='AuthenticatedCLIUsers'
+  AND EXISTS
+    (SELECT *
+     FROM isAlarmTriggered);
+Edit SQL
+Vulnerability Management
+Insecure TLS versions enabled
+Schedule
+Description:
+This query is designed to find Windows systems (Win7, Win Server 2012 R2 and above) that have overridden the disabling of insecure TLS versions. Learn more: https://community.carbonblack.com/t5/Query-Exchange/Insecure-TLS-versions-enabled/idi-p/102736
+Results:
+Returns the type, protocol, and status of TLS protocols.
+Carbon Black recommends that you run this query as needed
+
+SELECT CASE
+           WHEN DATA = '0' THEN 'TRUE'
+           ELSE 'FALSE'
+       END 'insecure_protocol_enabled',
+           split(KEY,
+                 '\\',7) AS 'protocol',
+  split(key,'\\',8) AS 'TYPE'
+FROM registry WHERE key LIKE 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\%\%'
+  AND name = 'DisabledByDefault'
+  AND split(split(key,'\\',7),' ',1) < '1.2';
+SELECT
+  CASE WHEN data = '0'
+       THEN 'TRUE'
+       ELSE 'FALSE'
+  END 'insecure_protocol_enabled',
+  split(key,'\\',7) as 'protocol',
+  split(key,'\\',8) as 'TYPE'
+FROM registry WHERE key LIKE 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\%\%'
+  AND name = 'DisabledByDefault';
+Edit SQL
+Vulnerability Management
+Installed DEB packages
+Schedule
+Description:
+DEB files are installed on Debian-based Linux distributions and contain two TAR archives, which contain the executable, documentation, and libraries.
+Results:
+Lists the installed DEB packages and information such as version, size, and architecture.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM deb_packages;
+Edit SQL
+Vulnerability Management
+Installed RPM Packages
+Schedule
+Description:
+Red Hat Package Manager (RPM) installs packages on Linux machines.
+Results:
+Lists the installed RPM packages on RHEL based Linux distributions.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM rpm_packages;
+Edit SQL
+Vulnerability Management
+Installed Windows Applications
+Schedule
+Description:
+See which programs and applications were installed by the Windows installer msiexec.exe.
+Results:
+Returns information about installed applications such as version, install location, and installation source.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       VERSION,
+       install_location,
+       install_source,
+       publisher,
+       install_date,
+       uninstall_string
+FROM programs;
+Edit SQL
+Vulnerability Management
+Installed Windows Drivers (UPDATED)
+Schedule
+Description:
+Discover all installed “in use” drivers on a system.
+Results:
+Lists driver image, service, version, and other data.
+Carbon Black recommends that you run this query as needed
+
+SELECT device_name,
+       inf AS PATH,
+       service,
+       VERSION,
+       CLASS,
+       manufacturer,
+       datetime(date,'unixepoch', 'localtime') AS date,
+       CASE signed
+           WHEN 1 THEN 'TRUE'
+           ELSE 'FALSE'
+       END 'signed'
+FROM drivers;
+Edit SQL
+Vulnerability Management
+Installed Windows Patches
+Schedule
+Description:
+Discover all patches that are applied to a Windows machine, excluding MSI or Windows Service Packs.
+Results:
+Lists data from installed patches such as csname, hotfix ID, fix comments, and other data.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM patches;
+Edit SQL
+Sensor Analysis
+Interactive Logon Session Information
+Schedule
+Description:
+Review the logon session information gathered by the CBC Windows sensor for interactive logon types. Requires Carbon Black Cloud Windows sensor versions 3.9+.
+Results:
+Lists session information including active or inactive, user domain name, username, logon time, and logon type.
+Carbon Black recommends that you run this query as needed
+
+SELECT active,
+       logon_time,
+       user_domain_name,
+       user_name,
+       logon_type
+FROM cb_sensor_logon_sessions
+WHERE logon_type LIKE 'interactive%';
+Edit SQL
+Vulnerability Management
+Internet Explorer Browser Extensions (UPDATED)
+Schedule
+Description:
+View the extensions that are installed on IE on a Windows system. Learn more: https://attack.mitre.org/techniques/T1176/
+Results:
+Returns information about extensions such as name, registry path, and version.
+Carbon Black recommends that you run this query as needed
+
+SELECT ie.*,
+       datetime(re.mtime, 'unixepoch', 'localtime') AS 'install_date (based on registry entry)'
+FROM ie_extensions AS ie
+JOIN registry AS re ON ie.registry_path = re.path;
+Edit SQL
+IT Hygiene
+Linux eBPF Kernel Header Check
+Schedule
+Description:
+Checks if kernel headers are installed correctly on your Linux machines. This is required for expanded distro support for the 2.10.1+ CBC Linux sensors. Instructions on how to install kernel headers can be found at https://docs.vmware.com/en/VMware-Carbon-Black-Cloud/services/cbc-sensor-installation-guide/GUID-11F7F7A9-9F85-473F-9C09-430F332F8870.html. This query is only intended for distros that support EEDR and ES as listed here https://community.carbonblack.com/t5/Documentation-Downloads/Carbon-Black-Cloud-sensor-Linux-sensor-support/ta-p/66266.
+Results:
+Returns EBPF_MODULE_SUPPORTED as True or False, depending on whether or not the kernel headers need to be installed. Returns KERNEL_HEADERS_INSTALLED as True or False, indicating whether or not the kernel headers are installed. Returns PATH as the path at which the kernel headers are installed. If this query returns EBPF_MODULE_SUPPORTED as True and KERNEL_HEADERS_INSTALLED as False, kernel headers need to be installed on that machine in order for the CBC Linux sensor to function correctly. Otherwise the sensor will stay in Bypass mode.
+Carbon Black recommends that you run this query as needed
+
+WITH kernel_version_string AS
+  (SELECT REPLACE(
+                    (SELECT VERSION
+                     FROM kernel_info), '-default', ''))
+SELECT PATH,
+       CASE
+           WHEN EXISTS
+                  (SELECT major
+                   FROM os_version
+                   WHERE major < 8
+                     AND platform = 'rhel') THEN 'FALSE'
+           ELSE 'TRUE'
+       END 'eBPF_Module_Supported',
+           CASE COUNT(*)
+               WHEN 1 THEN 'TRUE'
+               WHEN 0 THEN 'FALSE'
+               ELSE 'UNEXPECTED_RESULT'
+           END 'Kernel_Headers_Installed'
+FROM FILE
+WHERE ((PATH = '/usr/src/kernels/' ||
+          (SELECT *
+           FROM kernel_version_string))
+       OR (PATH = '/usr/src/linux-headers-' ||
+             (SELECT *
+              FROM kernel_version_string))
+       OR (PATH = '/usr/src/linux-' ||
+             (SELECT *
+              FROM kernel_version_string)));
+Edit SQL
+Compliance
+Linux iptables Details
+Schedule
+Description:
+Iptables controls firewall policies for network traffic.
+Results:
+Lists iptables details for configuration, rules, and connection states on Linux systems.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM iptables;
+Edit SQL
+Vulnerability Management
+Linux Kernel Modules
+Schedule
+Description:
+Kernel modules can be added or removed to Linux kernels.
+Results:
+Lists the loaded kernel modules and the load search path on the system.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM kernel_modules;
+Edit SQL
+IT Hygiene
+Linux Memory Utilization
+Schedule
+Description:
+Discover how applications are using memory.
+Results:
+Lists system memory and system swap utilization statistics, such as available space and partition names.
+Carbon Black recommends that you run this query as needed
+
+SELECT memory_total,
+       substr(((memory_total-memory_free*1.0)/memory_total)*100, 0, 6) AS "% memory used",
+       swap_total,
+       substr(((swap_total-swap_free*1.0)/swap_total)*100, 0, 6) AS "% swap used"
+FROM memory_info;
+Edit SQL
+Vulnerability Management
+List Install history
+Schedule
+Description:
+This query will collect all of the installed MacOS applications.
+Results:
+Returns the package ID, converted time, name, version, source, content type for the installed packages. Not all columns will be populated for all packages (e.g., version and content_type).
+Carbon Black recommends that you run this query as needed
+
+SELECT package_id,
+       datetime(TIME, 'unixepoch', 'localtime') AS TIME,
+       name,
+       VERSION,
+       SOURCE,
+       content_type
+FROM package_install_history;
+Edit SQL
+IT Hygiene
+List Logged in Users (MacOS/Linux) (UPDATED)
+Schedule
+Description:
+View the users who have an active shell and are logged into the target system.
+Results:
+Lists login type, user login name, remote hostname, and other data for all logged in users.
+Carbon Black recommends that you run this query as needed
+
+SELECT TYPE,
+       USER,
+       tty,
+       HOST,
+       datetime(TIME, 'unixepoch', 'localtime') AS TIME,
+       pid,
+       p.name,
+       p.cmdline,
+       sid,
+       registry_hive
+FROM logged_in_users
+JOIN processes AS p USING(pid);
+Edit SQL
+IT Hygiene
+List Logged in Users (Windows) (UPDATED)
+Schedule
+Description:
+View the users who have an active shell and are logged into the target system.
+Results:
+Lists login type, user login name, remote hostname, and other data for all logged in users.
+Carbon Black recommends that you run this query as needed
+
+SELECT TYPE,
+       USER,
+       tty,
+       HOST,
+       datetime(TIME, 'unixepoch', 'localtime') AS TIME,
+       pid,
+       sid,
+       registry_hive
+FROM logged_in_users;
+Edit SQL
+Threat Hunting
+List Running Processes (MacOS/Linux) (UPDATED)
+Schedule
+Description:
+Discover all processes that are running on a target system.
+Results:
+Lists all currently running processes on a target system, and other details such as threads, elapsed time, and process ID.
+Carbon Black recommends that you run this query as needed
+
+SELECT p1.pid,
+       p1.name,
+       p1.path,
+       p1.cmdline,
+       CASE p1.state
+           WHEN 'D' THEN 'UNINTERUPTABLE_SLEEP'
+           WHEN 'R' THEN 'RUNNING'
+           WHEN 'S' THEN 'INTERUPTABLE_SLEEP'
+           WHEN 'T' THEN 'STOPPED'
+           WHEN 'X' THEN 'DEAD'
+           WHEN 'Z' THEN 'ZOMBIE'
+           ELSE 'UNKNOWN'
+       END state,
+       u.username,
+       p1.uid,
+       g.groupname,
+       p1.gid,
+       p1.on_disk,
+       (printf('%.2f', ((p1.total_size * 1.0)/
+                          (SELECT physical_memory
+                           FROM system_info)) * 100)) || '%' AS '%_memory_used',
+       datetime(p1.start_time, 'unixepoch', 'localtime') AS start_time,
+       time((
+               (SELECT unix_time
+                FROM TIME) - p1.start_time),'unixepoch') AS elapsed_time,
+       p2.name AS parent_name,
+       p1.parent AS parent_pid,
+       p1.threads
+FROM processes AS p1
+JOIN processes AS p2 ON p1.parent = p2.pid
+JOIN users AS u USING(UID)
+JOIN groups AS g USING(gid);
+Edit SQL
+Threat Hunting
+List Running Processes (Windows Sensor 3.8.0.535 and Lower)(UPDATED)
+Schedule
+Description:
+Discover all processes that are running on a target system. This query requires Windows sensor versions 3.8.0.535 and lower.
+Results:
+Lists all currently running processes on a target system, and other details such as threads, elapsed time, and process ID.
+Carbon Black recommends that you run this query as needed
+
+SELECT p1.pid,
+       p1.name,
+       p1.path,
+       p1.cmdline,
+       p1.state,
+       u.username,
+       p1.uid,
+       g.groupname,
+       p1.gid,
+       p1.on_disk,
+       (printf('%.2f', ((p1.total_size * 1.0)/
+                          (SELECT physical_memory
+                           FROM system_info)) * 100)) || '%' AS '%_memory_used',
+       p1.threads,
+       datetime(p1.start_time, 'unixepoch', 'localtime') AS start_time,
+       time(p1.elapsed_time, 'unixepoch') AS elapsed_time,
+       p2.name AS parent_name,
+       p1.parent AS parent_pid,
+       CASE
+           WHEN p1.is_elevated_token = '1' THEN 'TRUE'
+           WHEN p1.is_elevated_token = '0' THEN 'FALSE'
+           ELSE 'UNKNOWN'
+       END 'is_elevated_token'
+FROM processes AS p1
+JOIN processes AS p2 ON p1.parent = p2.pid
+JOIN users AS u USING(UID)
+JOIN groups AS g USING(gid);
+Edit SQL
+Threat Hunting
+List Running Processes (Windows Sensor 3.8.0.627 and Higher)(UPDATED)
+Schedule
+Description:
+Discover all processes that are running on a target system. This query requires Windows sensor versions 3.8.0.627 and higher.
+Results:
+Lists all currently running processes on a target system, and other details such as threads, elapsed time, and process ID.
+Carbon Black recommends that you run this query as needed
+
+SELECT p1.pid,
+       p1.name,
+       p1.path,
+       p1.cmdline,
+       p1.state,
+       u.username,
+       p1.uid,
+       g.groupname,
+       p1.gid,
+       p1.on_disk,
+       (printf('%.2f', ((p1.total_size * 1.0)/
+                          (SELECT physical_memory
+                           FROM system_info)) * 100)) || '%' AS '%_memory_used',
+       p1.threads,
+       datetime(p1.start_time, 'unixepoch', 'localtime') AS start_time,
+       time(p1.elapsed_time, 'unixepoch') AS elapsed_time,
+       p2.name AS parent_name,
+       p1.parent AS parent_pid,
+       CASE
+           WHEN p1.elevated_token = '1' THEN 'TRUE'
+           WHEN p1.elevated_token = '0' THEN 'FALSE'
+           ELSE 'UNKNOWN'
+       END 'elevated_token'
+FROM processes AS p1
+JOIN processes AS p2 ON p1.parent = p2.pid
+JOIN users AS u USING(UID)
+JOIN groups AS g USING(gid);
+Edit SQL
+Compliance
+List Users on Linux Systems
+Schedule
+Description:
+Discover information about the users on the target Linux system.
+Results:
+Lists all users on a target system, including UID, GID, username, home directory, and default shell.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM users
+WHERE shell NOT IN ("/sbin/nologin",
+                    "/bin/sync",
+                    "/sbin/shutdown",
+                    "/sbin/halt");
+Edit SQL
+Compliance
+List Users on macOS Systems
+Schedule
+Description:
+Discover information about the users on the target macOS system.
+Results:
+Lists all users on a target system, including UID, GID, username, home directory, and default shell.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM users
+WHERE shell NOT IN ("/usr/bin/false",
+                    "/usr/sbin/uucico");
+Edit SQL
+Compliance
+List Users on Windows Systems
+Schedule
+Description:
+Discover information about the users on the target system.
+Results:
+Lists all users on a target Windows system, including UID, GID, username, home directory, and default shell.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM users
+WHERE UID >= 500;
+Edit SQL
+IT Hygiene
+LLMNR Poisoning - Credential Theft Hardening
+Schedule
+Description:
+Link-Local Multicast Name Resolution (LLMNR) and NetBios are protocols by which hosts can identify themselves after a DNS failure. Attackers can listen for LLMNR broadcasts and respond to them and capture user credentials passively. Learn more: https://attack.mitre.org/techniques/T1557/001/
+Results:
+Lists systems with LLMNR Status as DISABLED. If a status returns ENABLED, CB recommends deploying this IT Hygiene policy via GPO to protect against credential theft, as well as disabling NetBios Name Resolution.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE cnt
+           WHEN 1 THEN "ENABLED"
+           ELSE "DISABLED"
+       END "LLMNR Status"
+FROM
+  (SELECT count(name) AS cnt
+   FROM registry
+   WHERE PATH='HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient\\EnableMulticast'
+     AND DATA = 1);
+Edit SQL
+IT Hygiene
+Local Admin Password Management
+Schedule
+Description:
+The Microsoft Local Administrator Password Solution (LAPS) protects the same local admin credentials from being used across multiple endpoints. Learn more: https://attack.mitre.org/techniques/T1078/
+Results:
+Lists Windows endpoints that have LAPS Status ENABLED, if LAPS is present in the environment.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE cnt
+           WHEN 0 THEN "DISABLED"
+           ELSE "ENABLED"
+       END "LAPS Status"
+FROM
+  (SELECT count(name) AS cnt
+   FROM registry
+   WHERE KEY IN ('HKEY_LOCAL_MACHINE\Software\Microsoft\Policies\LAPS',
+                 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\LAPS',
+                 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\LAPS\Config',
+                 'HKEY_LOCAL_MACHINE\Software\Policies\Microsoft Services\AdmPwd')
+     AND DATA!=0);
+Edit SQL
+Compliance
+Local Administrator Accounts
+Schedule
+Description:
+The query allows you to check macOS systems for local administrator accounts. The administrator on a Mac has full privileges to install programs, uninstall them, modify files, or compromise the system. Learn more: https://community.carbonblack.com/t5/Query-Exchange/macOS-Local-Administrator-Accounts/idi-p/106837
+Results:
+Returns User ID, Username, User description.
+Carbon Black recommends that you run this query as needed
+
+SELECT u.uuid,
+       u.username,
+       u.description
+FROM users AS u
+INNER JOIN user_groups AS g ON g.gid=u.gid
+WHERE g.gid = 20
+GROUP BY username;
+Edit SQL
+Compliance
+Local Administrator Permissions (w/ Domain Users) (UPDATED)
+Schedule
+Description:
+The Least Privileged Model reduces risk by limiting the users who have admin permissions. Recommended best practice is to audit and limit access to administrative privileges. Learn more: https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/plan/security-best-practices/implementing-least-privilege-administrative-models
+Results:
+Lists all users in the local administrative group on a target system, as well as user ID and group ID.
+Carbon Black recommends that you run this query daily
+
+SELECT u.directory,
+       u.uid,
+       u.uuid,
+       g.gid,
+       g.groupname,
+       g.group_sid
+FROM registry AS r
+JOIN groups AS g ON DATA = group_sid
+JOIN users AS u ON regex_match(KEY, 'S\-[\-0-9]+', 0) = u.uuid
+WHERE KEY LIKE 'HKEY_USERS\%\SOFTWARE\Microsoft\Windows\CurrentVersion\Group Policy\GroupMembership'
+  AND groupname = 'Administrators';
+Edit SQL
+Compliance
+Local Administrator Permissions (w/o Domain Users) (UPDATED)
+Schedule
+Description:
+The Least Privileged Model reduces risk by limiting the users who have admin permissions. Recommended best practice is to audit and limit access to administrative privileges. Learn more: https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/plan/security-best-practices/implementing-least-privilege-administrative-models
+Results:
+Lists all local users in the local administrative group on a target system, as well as user ID and group ID.
+Carbon Black recommends that you run this query daily
+
+SELECT ug.uid,
+       g.groupname,
+       u.username,
+       u.directory
+FROM user_groups ug
+LEFT JOIN groups g ON g.gid = ug.gid
+LEFT JOIN users u ON ug.uid = u.uid
+WHERE g.groupname like '%Administrators%';
+Edit SQL
+Threat Hunting
+Local Cron Jobs
+Schedule
+Description:
+The cron daemon executes scheduled tasks without user interaction. Attackers can use these tasks to execute payloads on chosen time intervals. This enables persistent remote access to a target. Learn more: https://attack.mitre.org/techniques/T1053/
+Results:
+Lists all cron tasks on the target system.
+Carbon Black recommends that you run this query daily
+
+SELECT *
+FROM crontab;
+Edit SQL
+Sensor Analysis
+Local Scanner Status Data
+Schedule
+Description:
+Check if the local scanner is enabled and review activity totals.
+Results:
+Lists information about the local scanner, such as status, scan results, and VDF version.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE (category='Version'
+       AND name='LocalScannerEngineVersion')
+  OR (category='LocalScanner')
+UNION ALL
+SELECT name,
+       value
+FROM cb_sensor_counters
+WHERE (name LIKE 'AV:%'
+       AND name NOT LIKE 'AV:ScanDuration%');
+Edit SQL
+Sensor Analysis
+Local Scanner Version
+Schedule
+Description:
+Review local scanner engine version, VDF version, and VDF date.
+Results:
+Lists versions for scanner engines, signature packs, and VDFs.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE category='Version'
+  AND name='LocalScannerEngineVersion';
+Edit SQL
+IT Hygiene
+Local System Certificate Details (UPDATED)
+Schedule
+Description:
+System certificates verify the legal or government identity that publishes digital certificates.
+Results:
+Lists details related to local certificates stored on the target system, such as issue, certificate authority, common name, and other data.
+Carbon Black recommends that you run this query as needed
+
+SELECT common_name,
+       CASE ca
+           WHEN 1 THEN 'TRUE'
+           ELSE 'FALSE'
+       END ca,
+       CASE self_signed
+           WHEN 1 THEN 'TRUE'
+           ELSE 'FALSE'
+       END self_signed,
+       datetime(not_valid_before, 'unixepoch', 'localtime') AS not_valid_before,
+       datetime(not_valid_after, 'unixepoch', 'localtime') AS not_valid_after,
+       CASE
+           WHEN
+                  (SELECT unix_time
+                   FROM TIME) > not_valid_after THEN 'EXPIRED'
+           ELSE 'NOT_EXPIRED'
+       END status,
+       key_algorithm,
+       key_strength,
+       PATH
+FROM certificates;
+Edit SQL
+IT Hygiene
+Locate users that have logged in at least once
+Schedule
+Description:
+This query looks for the existence of a Windows user's folder which indicates that they have logged into a system at least once. Then it also pulls the last login time and type from the Windows Event Logs. There are two places with the username in the SQL below ('<USERNAME>') that need to be changed (remove the angle brackets) to the user you are looking for. Learn more: https://community.carbonblack.com/t5/Query-Exchange/Find-where-users-have-logged-in/idi-p/110870
+Results:
+Returns the path to the user’s directory, the username, the date/time the directory was created, the last login for the user, and the login type.
+Carbon Black recommends that you run this query as needed
+
+WITH wel AS
+  (SELECT datetime AS 'last_login',
+          json_extract(windows_eventlog.data, '$.EventData.TargetUserName') AS 'username',
+          CASE json_extract(windows_eventlog.data, '$.EventData.LogonType')
+              WHEN '2' THEN 'INTERACTIVE'
+              WHEN '3' THEN 'NETWORK'
+              WHEN '4' THEN 'BATCH'
+              WHEN '5' THEN 'SERVICE'
+              WHEN '7' THEN 'UNLOCK'
+              WHEN '8' THEN 'NETWORK_CLEAR_TEXT'
+              WHEN '9' THEN 'NEW_CREDENTIALS'
+              WHEN '10' THEN 'REMOTE_INTERACTIVE'
+              WHEN '11' THEN 'CACHED_INTERACTIVE'
+          END 'logon_type_description'
+   FROM windows_eventlog
+   WHERE channel = 'Security'
+     AND eventid = '4624'
+     AND json_extract(windows_eventlog.data, '$.EventData.TargetUserName') = '<USERNAME>'
+   ORDER BY datetime DESC
+   LIMIT 1),
+     dir AS
+  (SELECT PATH,
+          filename AS 'username',
+          datetime(btime, 'unixepoch', 'localtime') AS 'dir_created'
+   FROM FILE
+   WHERE PATH = '\users\<USERNAME>')
+SELECT *
+FROM dir
+JOIN wel USING(username);
+Edit SQL
+Threat Hunting
+Logon failures with the failure reason and logon type decoded
+Schedule
+Description:
+This query shows Windows logon failures parsed from event logs. This query is based on the information in this article- https://www.ultimatewindowssecurity.com/securitylog/book/page.aspx?spid=chapter5 Learn more: https://community.carbonblack.com/t5/Query-Exchange/Windows-logon-failures-with-the-failure-reason-and-logon-type/idi-p/102500
+Results:
+Returns the date/time, event ID, SID, username, failure reason (encoded/decoded), logon type (encoded/decoded), IP address, and port. In some cases the port is reported as ‘0’ as this data is not recorded in the event log. In this case querying Symon logs can provide the port number if Sysmon is enabled.
+Carbon Black recommends that you run this query as needed
+
+SELECT datetime,
+       eventid,
+       json_extract(windows_eventlog.data, '$.EventData.TargetUserSid') AS 'sid',
+       json_extract(windows_eventlog.data, '$.EventData.TargetUserName') AS 'username',
+       json_extract(windows_eventlog.data, '$.EventData.SubStatus') AS 'failure_reason',
+       CASE lower(json_extract(windows_eventlog.data, '$.EventData.SubStatus'))
+           WHEN '0xc0000064' THEN 'user name does not exist'
+           WHEN '0xc000006a' THEN 'user name is correct but the password is wrong'
+           WHEN '0xc0000234' THEN 'user is currently locked out'
+           WHEN '0xc0000072' THEN 'account is currently disabled'
+           WHEN '0xc000006d' THEN 'reason not specified'
+           WHEN '0xc000006f' THEN 'user tried to logon outside his day of week or time of day restrictions'
+           WHEN '0xc0000070' THEN 'workstation restriction'
+           WHEN '0xc0000193' THEN 'account expiration'
+           WHEN '0xc0000071' THEN 'expired password'
+           WHEN '0xc0000133' THEN 'clocks between DC and other computer too far out of sync'
+           WHEN '0xc0000224' THEN 'user is required to change password at next logon'
+           WHEN '0xc0000225' THEN 'evidently a bug in Windows and not a risk'
+       END 'failure_status_description',
+           json_extract(windows_eventlog.data, '$.EventData.LogonType') AS 'logon_type',
+           CASE json_extract(windows_eventlog.data, '$.EventData.LogonType')
+               WHEN '2' THEN 'INTERACTIVE'
+               WHEN '3' THEN 'NETWORK'
+               WHEN '4' THEN 'BATCH'
+               WHEN '5' THEN 'SERVICE'
+               WHEN '7' THEN 'UNLOCK'
+               WHEN '8' THEN 'NETWORK_CLEAR_TEXT'
+               WHEN '9' THEN 'NEW_CREDENTIALS'
+               WHEN '10' THEN 'REMOTE_INTERACTIVE'
+               WHEN '11' THEN 'CACHED_INTERACTIVE'
+           END 'logon_type_description',
+               json_extract(windows_eventlog.data, '$.EventData.IpAddress') AS 'ip_address',
+               json_extract(windows_eventlog.data, '$.EventData.IpPort') AS 'ip_port'
+FROM windows_eventlog
+WHERE channel = 'Security'
+  AND eventid ='4625'
+  AND (DATA NOT LIKE '%"LogonType":"4"%'
+       AND DATA NOT LIKE '%"LogonType":"5"%');
+Edit SQL
+Sensor Analysis
+LR Switch Status
+Schedule
+Description:
+Detect devices with Live Response (LR) disabled at the time of install via the command line install parameter "CBLR_KLL=value".
+Results:
+Lists devices with LR disabled in configuration properties.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_configprops
+WHERE name='CbLRKill'
+  AND value='1';
+Edit SQL
+Compliance
+macOS Disk Encryption Status
+Schedule
+Description:
+List macOS recognized disks and encryption status.
+Results:
+Lists device, alias, path, type, and encryption status.
+Carbon Black recommends that you run this query weekly
+
+SELECT m.device,
+       m.device_alias,
+       m.path,
+       m.type,
+       de.encryption_status
+FROM mounts m
+LEFT JOIN disk_encryption de ON de.name = m.device_alias
+WHERE m.device LIKE '/dev/%'
+ORDER BY m.device;
+Edit SQL
+Threat Hunting
+macOS LaunchDaemons
+Schedule
+Description:
+Attackers can use LaunchDaemons to gain persistence or privilege escalation. Learn more: https://attack.mitre.org/techniques/T1543/004/
+Results:
+Returns all macOS LaunchDaemons that launch an executable and keep it running.
+Carbon Black recommends that you run this query weekly
+
+SELECT name,
+       program || program_arguments AS executable
+FROM launchd
+WHERE (run_at_load = 1
+       AND keep_alive = 1)
+  AND (program != ''
+       OR program_arguments != '')
+  AND (executable NOT LIKE "/usr/%"
+       AND executable NOT LIKE "/bin/%"
+       AND executable NOT LIKE "/sbin/%"
+       AND executable NOT LIKE "/System/%"
+       OR executable LIKE "/usr/local/%");
+Edit SQL
+Threat Hunting
+Mata Family Yara Scan
+Schedule
+Description:
+Performs a Yara scan recursively of the C:\ directory for variants related to the Mata malware family. The Window's temp directory was chosen as an example, and we highly recommend that users modify this and other Yara queries to meet their threat hunting needs. Learn more: https://blog.netlab.360.com/dacls-the-dual-platform-rat-en/
+Results:
+If the yara signature hits on a file, the results will provide the full path of the file as well as the string variable name that matched and the offset (in hex) where the string matched. In case of timeout, modify your query in the SQL tab to focus on a more targeted path. Expand the query below using the "+" sign and click "Edit SQL" to open a new SQL Query with the existing code.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM yara
+WHERE PATH LIKE 'c:\windows\temp\%%'
+  AND sigrule = 'rule lazarus_mata_2019_Q4 : TAU APT Lazarus
+{
+  meta:
+    author = "VMware Threat Research" /* sknight */
+    date = "2020-Aug-05"
+    Validity = 10
+    severity = 10
+    Jira = "TR-4760"
+    description = "Lazarus Dacls RAT"
+    link = "https://blog.netlab.360.com/dacls-the-dual-platform-rat-en/"
+    rule_version = 1
+    yara_version = "3.11.0"
+    Confidence = "Prod"
+    Priority = "Medium"
+    TLP = "White"
+    exemplar_hashes = "846d8647d27a0d729df40b13a644f3bffdc95f6d0e600f2195c85628d59f1dc6, ba5b781ebacac07c4b14f9430a23ca0442e294236bd8dd14d1f69c6661551db8, e3285f3c898230f8e75c33bb6a6cf37acfc292a0e6d0c607beea1c7a84686dfe"
+  strings:
+    /* Server certificates */
+    $s1   = "c_2910.cls"
+    $s2   = "k_3872.cls"   
+    /*  AES key and seed*/
+    $b1   = { A0 D2 89 29 27 78 75 F6 AA 78 C7 98 39 A0 05 ED 39 18 82 62 33 EA 18 BB 18 30 78 97 A9 E1 8A 92 }
+    /* Command opcodes */
+    $op1  = { 02 06 00 00 }
+    $op2  = { 00 09 00 00 }
+    $op3  = { 00 07 00 00 }
+    $op4  = { 00 00 02 00 }
+    $op5  = { 00 01 02 00 }
+    $op6  = { 00 02 02 00 }
+    $op7  = { 00 03 02 00 }
+    $op8  = { ( bf | b9 ) 00 05 02 00 }
+    $op9  = { ( bf | b9 ) 00 06 02 00 }
+    $op10 = { 00 10 02 00 }
+    $op11 = { 00 11 02 00 }
+    $op12 = { 00 13 02 00 }
+    /* Common strings */
+    $c1 = "Content-Length" nocase
+    $c2 = "HTTP/1.1"
+    $c3 = "POST"
+  condition:
+        (
+            (uint16(0) == 0x5A4D) or
+            (uint16(0) == 0x457f) or
+            uint32 ( 0 ) == 0xfeedface or
+            uint32 ( 0 ) == 0xcefaedfe or
+            uint32 ( 0 ) == 0xfeedfacf or
+            uint32 ( 0 ) == 0xcffaedfe or
+            uint32 ( 0 ) == 0xcafebabe or
+            uint32 ( 0 ) == 0xbebafeca 
+        )
+        and
+        (
+            all of ($s*) or
+            all of ($b*) or
+            (
+                all of ($op*) and
+                #op8 > 30 and
+                #op9 > 10
+            )
+        ) and
+        all of ($c*) and
+        filesize < 2MB
+}';
+Edit SQL
+IT Hygiene
+Microsoft Exchange Version
+Schedule
+Description:
+View the currently installed version of Microsoft Exchange.
+Results:
+Returns the current patch level of Microsoft Exchange.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       VERSION
+FROM programs
+WHERE name = "Microsoft Exchange Server"
+LIMIT 1;
+Edit SQL
+Compliance
+Mounted System Devices on Linux/macOS
+Schedule
+Description:
+Discover which storage devices are mounted.
+Results:
+Lists all system devices and file systems mounted on a Linux or macOS device.
+Carbon Black recommends that you run this query as needed
+
+SELECT device,
+       device_alias,
+       TYPE,
+       blocks_size,
+       flags,
+       PATH
+FROM mounts;
+Edit SQL
+Threat Hunting
+Named and Anonymous Pipes (UPDATED)
+Schedule
+Description:
+Programming pipes are used to send information; named pipes can send data to each other, and anonymous pipes can only send data to a parent named pipe. Attackers can use pipes to circumvent traditional network monitoring and capture SMB traffic for implant tasking or lateral movement. Learn more: https://attack.mitre.org/techniques/T1071/
+Results:
+Returns details about all named and anonymous pipes on a Windows system, such as process ID, number of pipes instances that are running, and the pipe name.
+Carbon Black recommends that you run this query as needed
+
+SELECT pi.name AS pipe_name,
+       pr.name AS process_name,
+       pi.pid,
+       instances,
+       flags
+FROM processes AS pr
+JOIN pipes AS pi USING(pid);
+Edit SQL
+Compliance
+Network Adapter Device Information
+Schedule
+Description:
+Network adapters allow endpoints to communicate with other devices on the network.
+Results:
+Returns details for the network adapter on a target system, such as output bytes, interface type, and input packets.
+Carbon Black recommends that you run this query as needed
+
+SELECT interface,
+       mac,
+       mtu,
+       ierrors,
+       oerrors,
+       idrops,
+       odrops,
+       collisions,
+       link_speed,
+       description,
+       connection_id,
+       connection_status,
+       enabled,
+       physical_adapter,
+       service
+FROM interface_details;
+Edit SQL
+Compliance
+Network Adapter DHCP/DNS Information
+Schedule
+Description:
+See the specific information on a target system for DHCP and DNS configuration.
+Results:
+Returns details for DNS and DHCP, such as MAC address, lease expiration date, and DNS hostname.
+Carbon Black recommends that you run this query as needed
+
+SELECT description,
+       mac,
+       dhcp_enabled,
+       dhcp_lease_expires,
+       dhcp_lease_obtained,
+       dhcp_server,
+       dns_domain,
+       dns_domain_suffix_search_order,
+       dns_host_name,
+       dns_server_search_order
+FROM interface_details;
+Edit SQL
+Sensor Analysis
+Non-interactive Logon Session Information
+Schedule
+Description:
+Review the logon session information gathered by the CBC Windows sensor for non-interactive logon types. Requires Carbon Black Cloud Windows sensor versions 3.9+.
+Results:
+Lists session information including active or inactive, user domain name, username, logon time, and logon type.
+Carbon Black recommends that you run this query as needed
+
+SELECT active,
+       logon_time,
+       user_domain_name,
+       user_name,
+       logon_type
+FROM cb_sensor_logon_sessions
+WHERE logon_type NOT LIKE 'interactive%';
+Edit SQL
+Vulnerability Management
+OS Patch and Version Information
+Schedule
+Description:
+Make sure that the OS is up-to-date with the latest version and patches.
+Results:
+Returns OS information related to major, minor, patch, build, and codename versions.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       VERSION,
+       major,
+       minor,
+       patch,
+       build,
+       codename
+FROM os_version;
+Edit SQL
+Compliance
+OSX Firewall Status
+Schedule
+Description:
+Shows if the host-based OSX firewall has been disabled. Learn more: https://attack.mitre.org/techniques/T1562/001/
+Results:
+Lists the OSX firewall status. Fields show whether signed apps can receive connections, whether firewall unload, global state, and logging are enabled, and whether the firewall responds to ICMP (stealth mode).
+Carbon Black recommends that you run this query weekly
+
+SELECT CASE allow_signed_enabled
+           WHEN 0 THEN 'DISABLED'
+           ELSE 'ENABLED'
+       END allow_signed_enabled,
+       CASE firewall_unload
+           WHEN 0 THEN 'DISABLED'
+           ELSE 'ENABLED'
+       END firewall_unload,
+       CASE global_state
+           WHEN 0 THEN 'DISABLED'
+           WHEN 1 THEN 'ENABLED_WITH EXCEPTIONS'
+           WHEN 2 THEN 'ENABLED_BLOCK_ALL_INCOMING'
+       END global_state,
+       CASE logging_enabled
+           WHEN 0 THEN 'DISABLED'
+           ELSE 'ENABLED'
+       END logging_enabled,
+       logging_option,
+       CASE stealth_enabled
+           WHEN 0 THEN 'DISABLED'
+           ELSE 'ENABLED'
+       END stealth_enabled,
+       VERSION
+FROM alf;
+Edit SQL
+Compliance
+Physical Disk Details (UPDATED)
+Schedule
+Description:
+This query collects data on disk utilization for Windows systems Learn more: https://community.carbonblack.com/t5/Query-Exchange/Disk-utilization-on-Windows/idi-p/107578
+Results:
+Returns information on the disks in question, converts the bytes into gigabytes, and calculates the percent free on the disk.
+Carbon Black recommends that you run this query as needed
+
+SELECT device_id,
+       description,
+       file_system,
+       printf("%.2f", free_space/8589934592.0) AS 'free_space (GB)',
+       printf("%.2f", SIZE/8589934592.0) AS 'size (GB)',
+       printf("%.2f", (printf("%.2f", free_space/8589934592.0)/printf("%.2f", SIZE/8589934592.0))*100) AS '%_free'
+FROM logical_drives
+WHERE SIZE != '-1';
+Edit SQL
+Threat Hunting
+Potential socat TTY Misuse or Reverse Shells
+Schedule
+Description:
+Searches for socat or scripting connections to TTYs as non-root users. There may be cases of sysadmins using socat for legitimate reasons, but this should be rare. An example of potential misuse of socat is shown by the POC exploit for CVE-2019-18634 here - https://github.com/Plazmaz/CVE-2019-18634. Other examples of scripts connecting to ptys are shown here - http://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet Learn more: http://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet
+Results:
+Rows can indicate malicious use of socat or other reverse shells. Results that are returned should be investigated.
+Carbon Black recommends that you run this query as needed
+
+SELECT DISTINCT processes.pid,
+                processes.path,
+                processes.cmdline,
+                processes.parent,
+                processes.pgroup,
+                processes.uid
+FROM processes
+INNER JOIN process_open_files ON process_open_files.pid = processes.pid
+WHERE (process_open_files.path IN ('/dev/ptmx',
+                                   '/dev/tty')
+       OR process_open_files.path like '/dev/pts/%'
+       OR process_open_files.path like '/dev/tty%')
+  AND processes.name IN ('socat',
+                         'python',
+                         'python2',
+                         'python3',
+                         'perl',
+                         'php',
+                         'ruby');
+Edit SQL
+Sensor Analysis
+Processes with API Bypass Permissions
+Schedule
+Description:
+Detect processes running with API bypass permissions (due to policy rules).
+Results:
+Lists command line, file name, PID, reputation, reputation source, parent command line, parent PID, and the start time of processes running with API bypass permissions.
+Carbon Black recommends that you run this query as needed
+
+SELECT cb_sensor_processes.parent_pid,
+       cb_sensor_processes.parent_cmd_line,
+       cb_sensor_processes_policy.parent_bypass_policy,
+       cb_sensor_processes.pid,
+       cb_sensor_processes.start_time,
+       cb_sensor_processes.terminated,
+       cb_sensor_processes.file_name,
+       cb_sensor_processes.cmd_line,
+       cb_sensor_processes_policy.applied_bypass_policy,
+       cb_sensor_processes.interpreted,
+       cb_sensor_processes.script_name,
+       cb_sensor_processes_policy.script_bypass_policy,
+       cb_sensor_processes_reputation.effective_reputation,
+       cb_sensor_processes_reputation.effective_reputation_source
+FROM cb_sensor_processes
+JOIN cb_sensor_processes_policy ON cb_sensor_processes.pid = cb_sensor_processes_policy.pid
+JOIN cb_sensor_processes_reputation ON cb_sensor_processes.pid = cb_sensor_processes_reputation.pid
+WHERE cb_sensor_processes_policy.applied_bypass_policy='BypassAPI'
+  AND cb_sensor_processes_reputation.cb_sensor!='Ignore'
+  AND cb_sensor_processes.file_name NOT LIKE 'C:\program files\confer\%';
+Edit SQL
+Sensor Analysis
+Processes with Full Bypass Permissions
+Schedule
+Description:
+Detect processes running with full bypass permissions (due to policy rules applied to processes or parent processes).
+Results:
+Lists command line, file name, PID, reputation, reputation source, parent command line, parent PID, and the start time of processes running with full bypass permissions.
+Carbon Black recommends that you run this query as needed
+
+SELECT cb_sensor_processes.parent_pid,
+       cb_sensor_processes.parent_cmd_line,
+       cb_sensor_processes_policy.parent_bypass_policy,
+       cb_sensor_processes.pid,
+       cb_sensor_processes.start_time,
+       cb_sensor_processes.terminated,
+       cb_sensor_processes.file_name,
+       cb_sensor_processes.cmd_line,
+       cb_sensor_processes_policy.applied_bypass_policy,
+       cb_sensor_processes.interpreted,
+       cb_sensor_processes.script_name,
+       cb_sensor_processes_policy.script_bypass_policy,
+       cb_sensor_processes_reputation.effective_reputation,
+       cb_sensor_processes_reputation.effective_reputation_source
+FROM cb_sensor_processes
+JOIN cb_sensor_processes_policy ON cb_sensor_processes.pid = cb_sensor_processes_policy.pid
+JOIN cb_sensor_processes_reputation ON cb_sensor_processes.pid = cb_sensor_processes_reputation.pid
+WHERE cb_sensor_processes_policy.applied_bypass_policy LIKE '%BypassFile%'
+  AND cb_sensor_processes_reputation.cb_sensor!='Ignore'
+  AND cb_sensor_processes.file_name NOT LIKE 'C:\program files\confer\%';
+Edit SQL
+Threat Hunting
+Processes with LD_PRELOAD ENV Linked Libraries
+Schedule
+Description:
+The LD_PRELOAD ENV variable allows shared libraries or objects to load before others, allowing attackers to hijack by using process injection and disrupting normal behavior. Learn more: https://attack.mitre.org/techniques/T1055/
+Results:
+Lists processes with dynamically linked libraries on Linux and macOS.
+Carbon Black recommends that you run this query daily
+
+SELECT process_envs.pid,
+       process_envs.key,
+       process_envs.value,
+       processes.name,
+       processes.path,
+       processes.cmdline,
+       processes.cwd
+FROM process_envs
+JOIN processes USING (pid)
+WHERE KEY = 'LD_PRELOAD';
+Edit SQL
+Threat Hunting
+Programs Installed In Non-Standard Locations
+Schedule
+Description:
+Malware often will install itself in user directories that are hidden by default in an effort to not be easily detected. This query will look for executables in the root of those directories. Learn more: https://community.carbonblack.com/t5/Query-Exchange/Programs-Installed-In-Non-Standard-Windows-Locations/idi-p/86760
+Results:
+Returns the path and the file dates and times for files with an “.exe” extension.
+Carbon Black recommends that you run this query as needed
+
+SELECT PATH,
+       DATETIME(atime, "unixepoch", "localtime") AS "Last Accessed",
+       DATETIME(mtime, "unixepoch", "localtime") AS "Last Modified",
+       DATETIME(btime, "unixepoch", "localtime") AS "Created"
+FROM FILE
+WHERE PATH LIKE "\users\%\AppData\%.exe"
+  OR PATH LIKE "\users\%\AppData\Roaming\%.exe"
+  OR PATH LIKE "\ProgramData\%.exe";
+Edit SQL
+IT Hygiene
+PtH - Local Account Token Filter
+Schedule
+Description:
+Pass the Hash (PtH) allows attackers to authenticate as a user without having access to a password hash, if the registry key that allows remote User Account Control (UAC) is disabled. CB recommends deploying this policy via GPO to enable UAC. Learn more: https://attack.mitre.org/techniques/T1550/002/
+Results:
+Returns PTH Status on target systems as VULNERABLE if the UAC registry key is disabled, or NOT_VULNERABLE if it is enabled.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE cnt
+           WHEN 0 THEN "VULNERABLE"
+           ELSE "NOT_VULNERABLE"
+       END "PTH Status"
+FROM
+  (SELECT count(name) AS cnt
+   FROM registry
+   WHERE PATH='HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\LocalAccountTokenFilterPolicy'
+     AND DATA !=0);
+Edit SQL
+IT Hygiene
+PtH - Local Admin Account
+Schedule
+Description:
+Pass the Hash allows attackers to authenticate as a local admin without access to a password hash, if the GPO does not have the registry key FilterAdministratorToken set for the local admin account, RID 500. This policy is disabled by default on Windows machines; CB recommends deploying this IT Hygiene policy via GPO. However, this will break tools such as PsExec. Learn more: https://attack.mitre.org/techniques/T1550/002/
+Results:
+Returns PTH Status on target systems as VULNERABLE if the UAC registry key is disabled, or NOT_VULNERABLE if it is enabled.
+Carbon Black recommends that you run this query daily
+
+Threat Hunting
+RDP Activity - TerminalServices event log (UPDATED)
+Schedule
+Description:
+Searches the Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational event log for entries indicating RDP activity. Learn more: https://dfironthemountain.wordpress.com/2019/02/15/rdp-event-log-dfir/
+Results:
+If any entries are located where the event ID is 1149, indicating RDP activity, the results will provide the date and time this connection was established, the account used, and the source IP Address.
+Carbon Black recommends that you run this query as needed
+
+SELECT json_extract(windows_eventlog.data, '$.UserData.EventXML.Param1') AS username,
+       json_extract(windows_eventlog.data, '$.UserData.EventXML.Param2') AS DOMAIN,
+       json_extract(windows_eventlog.data, '$.UserData.EventXML.Param3') AS ip_address
+FROM windows_eventlog
+WHERE channel = 'Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational'
+  AND eventid = '1149';
+Edit SQL
+IT Hygiene
+RDP Connection Information
+Schedule
+Description:
+Adversaries can use the remote desktop protocol (RDP) to force their way into a system, so examine the process and network connection metadata for intruders. RDP runs on port 3389 by default, so if you change the port, update the query accordingly. Learn more: https://attack.mitre.org/techniques/T1021/001/
+Results:
+Lists process and network metadata associated with live RDP connections, such as open sockets, process ID, and local IP address.
+Carbon Black recommends that you run this query as needed
+
+SELECT processes.pid,
+       processes.name,
+       processes.cmdline,
+       process_open_sockets.local_address,
+       process_open_sockets.remote_address,
+       process_open_sockets.local_port,
+       process_open_sockets.remote_port
+FROM processes
+INNER JOIN process_open_sockets ON processes.pid=process_open_sockets.pid
+WHERE remote_port!=0
+  AND local_port=3389;
+Edit SQL
+Sensor Analysis
+RepCLI Authentication Status
+Schedule
+Description:
+Detect devices that were configured for authenticated usage of RepCLI command at the time of install.
+Results:
+Lists configured devices and the authenticated user or user group's SID value.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_configprops
+WHERE name='AuthenticatedCLIUsers'
+  AND value!='';
+Edit SQL
+IT Hygiene
+Retrieve Contents of etc/hosts on Linux
+Schedule
+Description:
+The local DNS file /etc/hosts converts hostnames or domain names to IP addresses, which Adware/Malware can modify to hijack local resolver requests.
+Results:
+Returns the contents of etc/hosts targets only if they were modified.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM etc_hosts;
+Edit SQL
+IT Hygiene
+Retrieve macOS Crash Information
+Schedule
+Description:
+Gather information from previous crashes on macOS. You can use CB LiveResponse to pull additional crash information.
+Results:
+Lists previously recorded macOS crashes and associated metadata.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM crashes;
+Edit SQL
+Threat Hunting
+Retrieve Shell History
+Schedule
+Description:
+Shell history inventories all commands that are used during the shell prompt.
+Results:
+Lists the shell history on Linux and macOS systems, such as UID, time, and command.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM users
+JOIN shell_history USING (UID);
+Edit SQL
+IT Hygiene
+Rogue Share detection
+Schedule
+Description:
+To distribute payloads, sniff credentials, or stage data prior to exfiltration, attackers use rogue network shares to gain access to unmonitored systems. Recommended best practice is to identify and monitor open shares on Windows systems that are not IT-supported. Learn more: https://attack.mitre.org/techniques/T1135/
+Results:
+Returns shares from target systems that are not built in hidden shares or on mapped drives.
+Carbon Black recommends that you run this query daily
+
+SELECT *
+FROM shared_resources
+WHERE NOT lower(name) = "admin$"
+  AND NOT lower(name) = "ipc$"
+  AND NOT lower(name) = "c$";
+Edit SQL
+Threat Hunting
+Root User Shell History
+Schedule
+Description:
+Security best practices dictate that no one should log in as root, and that sudo should be used instead. This practice ensures an audit trail of user activity. This query looks for the shell history for root users, which would be an indicator that someone is using the root account.
+Results:
+Lists TRUE for systems with a root user present in their shell history, FALSE for systems that do not. CB recommends conducting an immediate investigation into devices with root users present.
+Carbon Black recommends that you run this query weekly
+
+SELECT CASE
+           WHEN count(*) > 0 THEN "TRUE"
+           ELSE "FALSE"
+       END "ROOT USER COMMAND HISTORY"
+FROM users
+JOIN shell_history USING(UID)
+WHERE UID = 0;
+Edit SQL
+Vulnerability Management
+Salt-Master Remote Code Execution Vulnerability (CVE-2020-11651)
+Schedule
+Description:
+Discover Linux systems with salt-master installed that are vulnerable to remote code execution vulnerability CVE-2020-11651/11652. Learn more: https://community.saltstack.com/blog/critical-vulnerabilities-update-cve-2020-11651-and-cve-2020-11652
+Results:
+Shows systems with a version of the salt-master installed that is vulnerable to CVE-2020-11651 and CVE-2020-11652. Possible false-positives for back-ported patches to unsupported versions of salt-stack.
+Carbon Black recommends that you run this query as needed
+
+WITH packages AS
+  (SELECT name,
+          VERSION
+   FROM rpm_packages
+   WHERE NAME = 'salt-master'
+   UNION SELECT name,
+                VERSION
+   FROM deb_packages
+   WHERE NAME = 'salt-master')
+SELECT CASE
+           WHEN NOT ((major = 3000
+                      AND minor >= 2)
+                     OR (major = 2019
+                         AND minor >= 2
+                         AND patch >= 4)) THEN 'Vulnerable - PATCH Immediately: ' || name || ' ' || VERSION
+           ELSE NULL
+       END 'SALT CVE-2020-11651/11652'
+FROM
+  (SELECT name,
+          VERSION,
+          cast(split(VERSION, ".", 0) AS int) AS major,
+          cast(split(VERSION, ".", 1) AS int) AS minor,
+          cast(split(VERSION, ".", 2) AS int) AS patch
+   FROM packages
+   WHERE name = 'salt-master');
+Edit SQL
+Compliance
+Samsung Knox BIOS Security Status
+Schedule
+Description:
+Samsung endpoints have various below-the-OS security features to protect BIOS and report security violations. The query reports the security violation detected in the BIOS for the supported Samsung endpoint. Please find more detail here Learn more: https://pcmanagement.biz.samsung.com/support-resources/
+Results:
+BIOS security status for the Samsung endpoint. The status returned by the query is No Knox Security Alert Detected, Knox Security Alert Detected, or Not Available.
+Carbon Black recommends that you run this query daily
+
+WITH b1 AS
+  (SELECT COUNT(*) AS cnt,
+          1 AS one
+   FROM registry
+   WHERE PATH LIKE 'HKEY_LOCAL_MACHINE\SOFTWARE\SAMSUNG\BIOSCheck\%'
+     AND name = 'Result'
+     AND DATA LIKE '%KTA:False%'),
+     b2 AS
+  (SELECT COUNT(*) AS cnt,
+          1 AS one
+   FROM registry
+   WHERE PATH LIKE 'HKEY_LOCAL_MACHINE\SOFTWARE\SAMSUNG\BIOSCheck\%'
+     AND name = 'Result'
+     AND DATA LIKE '%KTA:True%'),
+     b3 AS
+  (SELECT hardware_vendor,
+          hardware_model,
+          1 AS one
+   FROM system_info)
+SELECT CASE
+           WHEN b1.cnt = 1 THEN "BIOS Security - No Knox Security Alert Detected"
+           WHEN b2.cnt = 1 THEN "BIOS Security - Knox Security Alert Detected"
+           WHEN (b1.cnt = 0
+                 AND b2.cnt = 0) THEN "NOT AVAILABLE"
+       END "BIOS_verification_status"
+FROM b1
+JOIN b2 USING(one)
+JOIN b3 USING(one)
+WHERE b3.hardware_vendor like 'SAMSUNG%';
+Edit SQL
+Threat Hunting
+Scheduled Task Created (UPDATED)
+Schedule
+Description:
+Searches the Security event log for entries indicating that a scheduled task was created on the system. Learn more: https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventid=4698
+Results:
+If any entries are located where the event ID is 4698, the results will provide the date and time the scheduled task was created along with the account that created the task and the information related to the task. The data column of this query provides a lot of detail, but it is in XML that is embedded in JSON and therefore not parseable with a query. This blob of data will have to be parsed manually or outside of Live Query.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM windows_eventlog
+WHERE channel = 'Security'
+  AND eventid = '4698';
+Edit SQL
+Threat Hunting
+Scheduled Task Modified (UPDATED)
+Schedule
+Description:
+This event type is not collected by default and has to be configured to do so in GPO or the local security policy. Searches the Security event log for entries indicating that a scheduled task was modified (deleted, disabled, or enabled) on the system. Learn more: https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventid=4699
+Results:
+If any entries are located where the event ID is 4699, 4700, or 4701 the results will provide the date and time the scheduled task was modified along with the account that modified the information related to the task. The data column of this query provides a lot of detail, but it is in XML that is embedded in JSON and therefore not parseable with a query. This blob of data will have to be parsed manually or outside of Live Query.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM windows_eventlog
+WHERE channel = 'Security'
+  AND (eventid = '4699'
+       OR eventid = '4700'
+       OR eventid = '4701');
+Edit SQL
+Threat Hunting
+Scheduled Tasks
+Schedule
+Description:
+Adversaries can schedule a task to execute programs at system startup or on a scheduled basis for nefarious purposes, such as persistence or lateral movement. Learn more: https://attack.mitre.org/techniques/T1053/
+Results:
+Returns information about scheduled tasks such as last run time, executable path, and name of the task.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       action,
+       PATH,
+       enabled,
+       state,
+       hidden,
+       datetime(last_run_time, "unixepoch", "localtime") AS last_run_time,
+       datetime(next_run_time, "unixepoch", "localtime") AS next_run_time,
+       last_run_message,
+       last_run_code
+FROM scheduled_tasks;
+Edit SQL
+Threat Hunting
+Search for Persistence through Windows Services installed within the Past 30 days
+Schedule
+Description:
+Search Windows service creation events using the system logs event id 7045 from the past 30 days. Learn more: https://community.carbonblack.com/t5/Query-Exchange/Search-Hunt-for-Persistence-through-Windows-Services-installed/idi-p/107818
+Results:
+All services created within the past 30 days with json extractions for relevant data. Sort and filter for rare service installs across the environment to identify potentially suspicious programs.
+Carbon Black recommends that you run this query as needed
+
+SELECT datetime,
+       eventid,
+       json_extract(windows_eventlog.data, '$.EventData.ServiceName') AS 'ServiceName',
+       json_extract(windows_eventlog.data, '$.EventData.ImagePath') AS 'ImagePath',
+       json_extract(windows_eventlog.data, '$.EventData.StartType') AS 'StartType',
+       json_extract(windows_eventlog.data, '$.EventData.AccountName') AS 'AccountName',
+       json_extract(windows_eventlog.data, '$.EventData.ServiceType') AS 'ServiceType',
+       DATA
+FROM windows_eventlog
+WHERE channel = 'System'
+  AND (eventid ='7045')
+  AND DATA not like '%"ServiceName":"CB Defense"%'
+  AND DATA not like '%"ServiceName":"Carbon Black%"%'
+  AND datetime > datetime('now', '-30 day');
+Edit SQL
+Threat Hunting
+Search windows artifacts of execution for evidence of a file
+Schedule
+Description:
+Search multiple artifacts of execution for a specific binary. The query searches several tables; shimcache, filesystem (prefetch), background activity moderator, and userassist. These tables are not exhaustive of all execution artifacts but lays the ground work as osquery continues to add new artifact and tables. To use: find+replace 'malicious.exe' with the file (executable) to search. Learn more: https://community.carbonblack.com/t5/Query-Exchange/Search-windows-artifacts-of-execution-for-evidence-of-a-file/idi-p/107816
+Results:
+Timestamp and path related to the source artifact of the file.
+Carbon Black recommends that you run this query as needed
+
+SELECT f.path,
+       ua.path AS ua_path,
+       shim.path AS shim_path,
+       bam.path AS bam_path,
+       datetime(shim.modified_time, 'unixepoch') AS shim_file_last_modified_time,
+       datetime(bam.last_execution_time, 'unixepoch') AS bam_file_last_execution_time,
+       datetime(ua.last_execution_time, 'unixepoch') AS ua_file_last_execution_time,
+       datetime(f.mtime, 'unixepoch') AS filesystem_last_modified_time,
+       datetime(f.btime, 'unixepoch') AS filesystem_created_time,
+       ROUND((f.size * 10e-7),4) AS size_megabytes
+FROM background_activities_moderator AS bam
+LEFT JOIN userassist AS ua USING (PATH)
+LEFT JOIN shimcache AS shim USING (PATH)
+LEFT JOIN FILE AS f USING (PATH)
+WHERE (shim.path like '%malicious.exe'
+  OR bam.path like '%malicious.exe'
+  OR ua.path like '%malicious.exe'
+  OR (f.directory IN ('c:\windows\prefetch\','c:\windows\','c:\programdata\','c:\') and f.filename like 'malicious.exe%')) UNION select f.path,ua.path as ua_path,shim.path as shim_path,bam.path as bam_path,
+    datetime(shim.modified_time,'unixepoch') AS shim_file_last_modified_time,
+    datetime(bam.last_execution_time,'unixepoch') AS bam_file_last_execution_time,
+    datetime(ua.last_execution_time,'unixepoch') AS ua_file_last_execution_time,
+    datetime(f.mtime,'unixepoch') AS filesystem_last_modified_time,
+    datetime(f.btime,'unixepoch') AS filesystem_created_time,
+    ROUND((f.size * 10e-7),4) AS size_megabytes
+FROM userassist as ua LEFT JOIN background_activities_moderator as bam
+    using (path)
+LEFT JOIN shimcache as shim
+    using (path)
+LEFT JOIN file as f
+    using (path)
+WHERE (shim.path like '%malicious.exe' OR bam.path like '%malicious.exe' OR ua.path like '%malicious.exe' OR (f.directory IN ('c:\windows\prefetch\','c:\windows\','c:\programdata\','c:\') and f.filename like 'malicious.exe%')) UNION select f.path,ua.path as ua_path,shim.path as shim_path,bam.path as bam_path,
+    datetime(shim.modified_time,'unixepoch') AS shim_file_last_modified_time,
+    datetime(bam.last_execution_time,'unixepoch') AS bam_file_last_execution_time,
+    datetime(ua.last_execution_time,'unixepoch') AS ua_file_last_execution_time,
+    datetime(f.mtime,'unixepoch') AS filesystem_last_modified_time,
+    datetime(f.btime,'unixepoch') AS filesystem_created_time,
+    ROUND((f.size * 10e-7),4) AS size_megabytes
+FROM shimcache as shim LEFT JOIN background_activities_moderator as bam
+    using (path)
+LEFT JOIN userassist as ua
+    using (path)
+LEFT JOIN file as f
+    using (path)
+WHERE (shim.path like '%malicious.exe' OR bam.path like '%malicious.exe' OR ua.path like '%malicious.exe' OR (f.directory IN ('c:\windows\prefetch\','c:\windows\','c:\programdata\','c:\') and f.filename like 'malicious.exe%')) UNION select f.path,ua.path as ua_path,shim.path as shim_path,bam.path as bam_path,
+    datetime(shim.modified_time,'unixepoch') AS shim_file_last_modified_time,
+    datetime(bam.last_execution_time,'unixepoch') AS bam_file_last_execution_time,
+    datetime(ua.last_execution_time,'unixepoch') AS ua_file_last_execution_time,
+    datetime(f.mtime,'unixepoch') AS filesystem_last_modified_time,
+    datetime(f.btime,'unixepoch') AS filesystem_created_time,
+    ROUND((f.size * 10e-7),4) AS size_megabytes
+FROM file as f LEFT JOIN background_activities_moderator as bam
+    using (path)
+LEFT JOIN userassist as ua
+    using (path)
+LEFT JOIN shimcache as shim
+    using (path)
+WHERE (f.directory IN ('c:\windows\prefetch\','c:\windows\','c:\programdata\','c:\')
+    and f.filename like 'malicious.exe%');
+Edit SQL
+Compliance
+Secure Boot Status
+Schedule
+Description:
+Secure Boot should be enabled to protect endpoints against malicious code being executed at boot time. Secure Boot requires UEFI, so not all endpoints may be able to use this feature. This query will identify these devices as the registry key will not be present. Learn more: https://docs.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-secure-boot
+Results:
+Lists DISABLED for endpoints that don't have Secure Boot enabled, ENABLED for those that do, and NON-UEFI for endpoints that can't leverage the Secure Boot feature. If DISABLED, CB recommends enabling Secure Boot on these devices.
+Carbon Black recommends that you run this query weekly
+
+WITH sb1 AS
+  (SELECT COUNT(*) AS cnt,
+          1 AS one
+   FROM registry
+   WHERE PATH='HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot\State\UEFISecureBootEnabled'),
+     sb2 AS
+  (SELECT COUNT(*) AS cnt,
+          1 AS one
+   FROM registry
+   WHERE PATH='HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot\State\UEFISecureBootEnabled'
+     AND DATA = 1)
+SELECT CASE
+           WHEN sb1.cnt = 0 THEN "NON-UEFI"
+           WHEN sb2.cnt = 1 THEN "ENABLED"
+           WHEN sb2.cnt = 0 THEN "DISABLED"
+       END SECUREBOOT_STATUS
+FROM sb1
+JOIN sb2 USING(one);
+Edit SQL
+Sensor Analysis
+Sensor Counter Data
+Schedule
+Description:
+View every sensor action since the last sensor restart to help troubleshoot performance issues.
+Results:
+Lists sensor counts since the last restart.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM cb_sensor_counters
+WHERE name LIKE 'FileCallback:PostCreate%';
+Edit SQL
+Sensor Analysis
+Sensor in Bypass
+Schedule
+Description:
+Detect sensors running in bypass. Prevention is disabled.
+Results:
+Lists device and sensor bypass state.
+Carbon Black recommends that you run this query as needed
+
+WITH isBypassEnabled AS
+  (SELECT name,
+          value
+   FROM cb_sensor_status
+   WHERE category='General'
+     AND ((name='SensorState'
+           AND value NOT LIKE 'Enabled')
+          OR (name='ProtectionDelay'
+              AND value!='')))
+SELECT *
+FROM isBypassEnabled
+UNION ALL
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE category='General'
+  AND name='SensorStateDetails'
+  AND EXISTS
+    (SELECT *
+     FROM isBypassEnabled);
+Edit SQL
+Sensor Analysis
+Sensor Manifest Download Errors
+Schedule
+Description:
+This query requires Windows sensor versions 3.8 and later. See which sensors encounter errors while downloading content from content.carbonblack.io. Access is required for full functionality. Learn more: https://community.carbonblack.com/t5/Documentation-Downloads/Action-Required-for-Upcoming-Carbon-Black-Cloud-3-6-Windows/ta-p/93218
+Results:
+If a device has intermittent download errors, LastManifestContentUpdate returns a "last updated" timestamp. If a device has never downloaded manifest content, it returns a null value.
+Carbon Black recommends that you run this query weekly
+
+WITH isAlarmTriggered AS
+  (SELECT *
+   FROM cb_sensor_status
+   WHERE category='Alarms'
+     AND name='ManifestDownloadFailure')
+SELECT *
+FROM isAlarmTriggered
+UNION ALL
+SELECT *
+FROM cb_sensor_status
+WHERE category='General'
+  AND name='LastManifestContentUpdate'
+  AND EXISTS
+    (SELECT *
+     FROM isAlarmTriggered);
+Edit SQL
+Sensor Analysis
+Sensor Network Connections
+Schedule
+Description:
+See every network connection established by the sensor.
+Results:
+Lists network connection paths, HTTP responses, and curl responses.
+Carbon Black recommends that you run this query as needed
+
+SELECT name,
+       value
+FROM cb_sensor_counters
+WHERE name LIKE 'https:%';
+Edit SQL
+Vulnerability Management
+Startup Platform Information
+Schedule
+Description:
+BIOS, ROM, and UEFI are responsible for initializing hardware components and startup sequences.
+Results:
+Lists information from BIOS, ROM, and UEFI on target systems.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM platform_info;
+Edit SQL
+Threat Hunting
+Successful RDP Logon - Security event log (UPDATED)
+Schedule
+Description:
+This event type is not collected by default and has to be configured to do so in GPO or the local security policy. Searches the Security event log for entries indicating successful RDP activity. Learn more: https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventid=4624
+Results:
+If any entries are located where the event ID is 4624 and the logon type is 10 or 3 (for NLA), indicating a successful RDP logon, the results will provide the date and time this connection was made as well as the account used.
+Carbon Black recommends that you run this query as needed
+
+SELECT datetime,
+       json_extract(windows_eventlog.data, '$.EventData.TargetUserName') AS username,
+       json_extract(windows_eventlog.data, '$.EventData.TargetUserSid') AS sid,
+       json_extract(windows_eventlog.data, '$.EventData.TargetDomainName') AS DOMAIN,
+       json_extract(windows_eventlog.data, '$.EventData.TargetLogonId') AS logon_id,
+       json_extract(windows_eventlog.data, '$.EventData.LogonType') AS logon_type,
+       CASE json_extract(windows_eventlog.data, '$.EventData.LogonType')
+           WHEN '2' THEN 'INTERACTIVE'
+           WHEN '3' THEN 'NETWORK'
+           WHEN '4' THEN 'BATCH'
+           WHEN '5' THEN 'SERVICE'
+           WHEN '7' THEN 'UNLOCK'
+           WHEN '8' THEN 'NETWORK_CLEAR_TEXT'
+           WHEN '9' THEN 'NEW_CREDENTIALS'
+           WHEN '10' THEN 'REMOTE_INTERACTIVE'
+           WHEN '11' THEN 'CACHED_INTERACTIVE'
+       END 'logon_type_description',
+           json_extract(windows_eventlog.data, '$.EventData.IpAddress') AS ip_address,
+           json_extract(windows_eventlog.data, '$.EventData.IpPort') AS port
+FROM windows_eventlog
+WHERE channel = 'Security'
+  AND eventid = '4624'
+  AND (DATA like '%"LogonType":"3"%'
+       OR DATA like '%"LogonType":"10"%');
+Edit SQL
+IT Hygiene
+Sysmon RDP Connection Logs
+Schedule
+Description:
+This query requires that Sysmon be enabled and that it is collecting logs on network connections. Once enabled this query will show information on RDP connections to and from the given host.
+Results:
+Returns the date/time in UTC, the event ID, connection details, and more.
+Carbon Black recommends that you run this query as needed
+
+SELECT datetime AS 'datetime (UTC)',
+       eventid,
+       split(split(json_extract(windows_eventlog.data, '$.EventData.RuleName'), ',', 1), '=', 1) AS technique,
+       split(split(json_extract(windows_eventlog.data, '$.EventData.RuleName'), ',', 0), '=', 1) AS technique_id,
+       json_extract(windows_eventlog.data, '$.EventData.User') AS 'username',
+       json_extract(windows_eventlog.data, '$.EventData.Image') AS 'process',
+       json_extract(windows_eventlog.data, '$.EventData.ProcessId') AS 'pid',
+       json_extract(windows_eventlog.data, '$.EventData.SourceIp') AS 'source_ip',
+       json_extract(windows_eventlog.data, '$.EventData.SourcePort') AS 'source_port',
+       json_extract(windows_eventlog.data, '$.EventData.DestinationIp') AS 'destination_ip',
+       json_extract(windows_eventlog.data, '$.EventData.DestinationPort') AS 'destination_port',
+       json_extract(windows_eventlog.data, '$.EventData.Initiated') AS 'initiated'
+FROM windows_eventlog
+WHERE channel = 'Microsoft-Windows-Sysmon/Operational'
+  AND eventid ='3'
+  AND json_extract(windows_eventlog.data, '$.EventData.DestinationPort') = '3389';
+Edit SQL
+Compliance
+System Information
+Schedule
+Description:
+System information contains data about software and hardware.
+Results:
+Lists detailed system information for diagnostic and troubleshooting purposes.
+Carbon Black recommends that you run this query as needed
+
+SELECT hostname,
+       cpu_type,
+       cpu_brand,
+       cpu_physical_cores,
+       cpu_logical_cores,
+       cpu_microcode,
+       (1.0 * physical_memory / (1000*1000*1000)) AS physical_mem_gb,
+       hardware_vendor,
+       hardware_model,
+       hardware_version,
+       hardware_serial
+FROM system_info;
+Edit SQL
+Vulnerability Management
+System Kernel Information
+Schedule
+Description:
+Kernels are part of the operating system and perform tasks such as memory utilization and task processing.
+Results:
+Lists kernel information for a target system, such as version, argument, and path.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM kernel_info;
+Edit SQL
+IT Hygiene
+System Logon and Logout Events
+Schedule
+Description:
+The Audit Logon policy captures user access to a target system (but does not track authentication events).
+Results:
+Lists of logon and logout events on Linux and macOS systems and associated data, such as logon type, logon ID, and session ID.
+Carbon Black recommends that you run this query weekly
+
+SELECT username,
+       tty,
+       pid,
+       CASE TYPE
+           WHEN 0 THEN "EMPTY"
+           WHEN 1 THEN "RUN_LVL"
+           WHEN 2 THEN "BOOT_TIME"
+           WHEN 3 THEN "NEW_TIME"
+           WHEN 4 THEN "OLD_TIME"
+           WHEN 5 THEN "INIT_PROCESS"
+           WHEN 6 THEN "LOGIN_PROCESS"
+           WHEN 7 THEN "USER_PROCESS"
+           WHEN 8 THEN "DEAD_PROCESS"
+           WHEN 9 THEN "ACCOUNTING"
+       END AS TYPE,
+       DATETIME(TIME, "unixepoch", "localtime") AS TIME,
+       HOST
+FROM LAST
+ORDER BY username,
+         TIME DESC;
+Edit SQL
+Threat Hunting
+TinyPOS Family Yara Scan
+Schedule
+Description:
+Performs a Yara scan recursively of the C:\Windows\Temp directory for variants related to the TinyPOS malware family, as well as other related artifact files. The Window's temp directory was chosen as an example, and we highly recommend that users modify this and other Yara queries to meet their threat hunting needs. Learn more: https://www.carbonblack.com/blog/tau-technical-report-new-attack-combines-tinypos-with-living-off-the-land-techniques-for-scraping-credit-card-data/
+Results:
+If the yara signature hits on a file, the results will provide the full path of the file as well as the string variable name that matched and the offset (in hex) where the string matched. In case of timeout, modify your query in the SQL tab to focus on a more targeted path. Expand the query below using the "+" sign and click "Edit SQL" to open a new SQL Query with the existing code.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM yara
+WHERE PATH LIKE 'c:\windows\temp\%%'
+  AND sigrule = 'rule POS_2020_Q2_TinyPOS_exfil_file : TAU Ecrime POS
+{
+ meta:
+  author = "VMware Carbon Black Threat Research" /* jmyers */
+  date = "2020-May-4"
+  Validity = 10
+  severity = 10
+  description = "For Detection of Exfil Files created by this TinyPOS/PinkKite variant"
+  rule_version = 1
+  yara_version = "3.11.0"
+  Confidence = "Prod"
+  Priority = "Medium"
+  TLP = "White"
+  exemplar_hashes = "e48af0380d51eff554d56aabeeb5087bba37fa8fb02af1ccd155bb8b5079edae"
+ strings:
+  $b1 = {BD EA 4F 09} /* @@@@ header encoded */
+  $b2 = {20 20 20 20 DD 0A DD 0A} /* Delimiter used by malware */
+ condition:
+  all of them
+  /* Additional Condition configuration */
+  /* $b1 and #b2 > 1 */
+}
+rule POS_2020_Q2_TinyPOS_ImageFile_Encoded_SC : TAU Ecrime POS
+{
+ meta:
+  author = "VMware Carbon Black Threat Research" /* jmyers */
+  date = "2020-May-4"
+  Validity = 10
+  severity = 10
+  description = "For Detection of Image files containing encoded Shellcode"
+  rule_version = 1
+  yara_version = "3.11.0"
+  Confidence = "Prod"
+  Priority = "Medium"
+  TLP = "White"
+  exemplar_hashes = "e48af0380d51eff554d56aabeeb5087bba37fa8fb02af1ccd155bb8b5079edae"
+ strings:
+  $PNG = {89 50 4E 47} /* PNG header */
+  $BMP = {42 4D } /* BMP header */
+  $JPG = {FF D8 FF} /* JPG header */
+  $b1 = {48 31 DB 48 C7 C0 [10-20] 90 90 90 90}
+  $b2 = {CF CF CF CF}
+ condition:
+  ($PNG at 0
+   or $BMP at 0
+   or $JPG at 0)
+  and all of ($b*)
+}
+rule POS_2020_Q2_TinyPOS_PS_loader : TAU Ecrime POS
+{
+ meta:
+  author = "VMware Threat Research" /* jmyers */
+  date = "2020-May-4"
+  Validity = 10
+  severity = 10
+  description = "For Detection of PowerShell script used to load TinyPOS/PinkKite" /* It should be noted that this will catch numerous malicious PS scripts */
+  rule_version = 1
+  yara_version = "3.11.0"
+  Confidence = "Prod"
+  Priority = "Medium"
+  TLP = "White"
+  exemplar_hashes = "15712752daf007ea0db799a318412478c5a3a315a22932655c38ac6485f8ed00"
+ strings:
+  $ps1 = "powershell"
+  $s1 = "IABmAHUAbgBj"
+  $s2 = "WwBCAHkAdAB"
+ condition:
+  $ps1
+  and any of ($s*)
+}';
+Edit SQL
+IT Hygiene
+UAC Control Check (UPDATED)
+Schedule
+Description:
+User Account Control (UAC) allows non-admin users to act with admin privileges without switching to an admin account when a program requires elevated permissions. This is enabled by default on Windows and prevents the exposure of multiple admin accounts. Learn more: https://attack.mitre.org/techniques/T1548/002/
+Results:
+Returns EnableLUA=1 if UAC is enabled. If 0 is returned, UAC is disabled and CB recommends that you deploy this IT Hygiene Policy via GPO to enabled UAC and protect your environment.
+Carbon Black recommends that you run this query daily
+
+SELECT CASE cnt
+           WHEN 1 THEN 'ENABLED'
+           ELSE 'NOT_ENABLED'
+       END 'UAC Status'
+FROM
+  (SELECT COUNT(name) AS cnt
+   FROM registry
+   WHERE PATH = 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\EnableLUA'
+     AND DATA = 1);
+Edit SQL
+Sensor Analysis
+Unfinished Background Scans
+Schedule
+Description:
+Detect devices with active background scans.
+Results:
+Lists device, background scan status, and details such as files processed and current scan file path.
+Carbon Black recommends that you run this query as needed
+
+WITH isBackgroundScanActive AS
+  (SELECT name,
+          value
+   FROM cb_sensor_status
+   WHERE category='BackgroundScan'
+     AND name='BackgroundScanState'
+     AND value!='Complete'
+     AND value!='Disabled')
+SELECT *
+FROM isBackgroundScanActive
+UNION ALL
+SELECT name,
+       value
+FROM cb_sensor_status
+WHERE category='BackgroundScan'
+  AND (name='BackgroundScanProgress'
+       OR name='BackgroundScanFilesProcessed'
+       OR name='BackgroundScanCurrentDirectory')
+  AND EXISTS
+    (SELECT *
+     FROM isBackgroundScanActive);
+Edit SQL
+Compliance
+Unusual User Accounts
+Schedule
+Description:
+Lists user accounts with UID less than 500, except root, where the shell is NOT set to a non-interactive shell (sync, shutdown, halt, nologin, false). These accounts are system or service accounts, and may have additional privileges which can be leveraged for malicious purposes. Learn more: http://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/uidrange.html
+Results:
+Lists user accounts with UID less than 500, except root, where the shell is NOT set to a non-interactive shell.
+Carbon Black recommends that you run this query daily
+
+SELECT *
+FROM users
+WHERE shell NOT IN ("/bin/sync",
+                    "/sbin/shutdown",
+                    "/sbin/halt",
+                    "/sbin/nologin",
+                    "/usr/sbin/nologin",
+                    "/bin/false")
+  AND username != "root"
+  AND UID < 500;
+Edit SQL
+Compliance
+USB Devices on Linux/macOS
+Schedule
+Description:
+Discover how many USB devices are attached to the operating system.
+Results:
+Lists all USB devices that are attached to a Linux or macOS system.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM usb_devices;
+Edit SQL
+Compliance
+USB Devices on Windows
+Schedule
+Description:
+Discover how many USB devices are attached to the operating system.
+Results:
+Lists all USB devices that are attached to a Windows system.
+Carbon Black recommends that you run this query as needed
+
+SELECT r2.data AS "Friendly Name",
+       r1.name AS "Serial Number",
+       DATETIME(r2.mtime, 'unixepoch', 'localtime') AS 'Key Last Modified'
+FROM registry r1
+JOIN registry r2 ON r1.path = r2.key
+WHERE r1.key LIKE "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\USBSTOR\%"
+  AND r2.name = "FriendlyName";
+Edit SQL
+IT Hygiene
+User SSH Keys on Linux/macOS
+Schedule
+Description:
+User SSH keys encrypts data when transmitting data.
+Results:
+Lists all user SSH keys on a target system and returns 1 if they are encrypted, 0 if not.
+Carbon Black recommends that you run this query daily
+
+SELECT *
+FROM users
+JOIN user_ssh_keys USING (UID);
+Edit SQL
+Compliance
+Verify RDP Status
+Schedule
+Description:
+Remote Desktop Protocol (RDP) can remotely access Windows systems. CB recommends auditing and limiting RDP capabilities to reduce possible malicious access. Learn more: https://attack.mitre.org/techniques/T1021/001/
+Results:
+If there are active connections, returns 0 if RDP is enabled, or 1 if disabled. Includes metadata such as process ID and open sockets.
+Carbon Black recommends that you run this query as needed
+
+SELECT CASE DATA
+           WHEN 0 THEN "Enabled"
+           WHEN 1 THEN "Disabled"
+       END "RDP Status"
+FROM registry
+WHERE PATH="HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\fDenyTSConnections";
+Edit SQL
+Vulnerability Management
+Weak Authentication Types (LM/NTLM)
+Schedule
+Description:
+Detects endpoints using weak authentication types LM and NTLM, which use encryption algorithms that are similar to sending passwords in plain text. NTLM is also outdated and vulnerable to relay attacks. It is critical that all endpoints use NTLMv2 or higher. Learn more: https://docs.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/network-security-lan-manager-authentication-level
+Results:
+Lists systems with only strong authentication types (NTLMv2) as TRUE. If FALSE, CB recommends enabling NTLMv2 or higher authentication types while disabling LM/NTLM authentication.
+Carbon Black recommends that you run this query weekly
+
+SELECT CASE COUNT(*)
+           WHEN 0 THEN "FALSE"
+           ELSE "TRUE"
+       END "NTLMv2 Only Enabled"
+FROM registry
+WHERE PATH='HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa\\LMCompatibilityLevel'
+  AND DATA != 5;
+Edit SQL
+IT Hygiene
+Windows Crash Information
+Schedule
+Description:
+Gather information from the minidump file of previous crashes in Windows. You can use LiveResponse to pull additional information.
+Results:
+Lists extracted minidump information such as pid, crash_path, and module.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM windows_crashes;
+Edit SQL
+Compliance
+Windows Event Log Retention (UPDATED)
+Schedule
+Description:
+The Windows Event Log contains messages for system, security, and application events, which overwrites itself by default to save disk space. Recommended best practice is to create a log retention policy for security events. By default, this event log overwrites at 1073742000 bytes. Learn more: https://docs.microsoft.com/en-us/windows/desktop/eventlog/eventlog-key
+Results:
+Returns ‘overwrite_status’ which indicates whether logs will be overwritten with new events when it reaches ‘MaxSize’. If the key ‘AutoBackupLogFiles’ exists and is -1 or 1 then auto-backup of the logs is enabled. If it does not exist the auto-backup is disabled.
+Carbon Black recommends that you run this query as needed
+
+SELECT PATH,
+       name,
+       TYPE,
+       DATA,
+       CASE
+           WHEN name = 'Retention'
+                AND DATA = '0' THEN 'ENABLED (Default)'
+           WHEN name = 'Retention'
+                AND DATA > '0' THEN 'DISABLED (new events wil be discarded when log reaches MaxSize)'
+       END 'overwrite_status'
+FROM registry
+WHERE PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\Security\\Retention"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\System\\Retention"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\Application\\Retention"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\Security\\MaxSize"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\System\\MaxSize"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\Application\\MaxSize"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\Security\\AutoBackupLogFiles"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\System\\AutoBackupLogFiles"
+  OR PATH="HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\Eventlog\\Application\\AutoBackupLogFiles";
+Edit SQL
+Compliance
+Windows Firewall Status
+Schedule
+Description:
+Shows if the host-based Windows firewall has been disabled. Learn more: https://attack.mitre.org/techniques/T1562/001/
+Results:
+Lists TRUE for endpoints that have Windows Firewall disabled, FALSE if enabled. If TRUE, CB recommends conducting an investigation into these devices and enabling the Windows Firewall.
+Carbon Black recommends that you run this query weekly
+
+SELECT CASE DATA
+           WHEN 0 THEN "TRUE"
+           WHEN 1 THEN "FALSE"
+       END "Firewall Disabled",
+       DATETIME(mtime, "unixepoch", "localtime") AS "Last Modified"
+FROM registry
+WHERE KEY = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile"
+  AND name = "EnableFirewall";
+Edit SQL
+Threat Hunting
+Windows Persistence Locations
+Schedule
+Description:
+When attackers have a persistent presence on a system, they can maintain access despite interruptions, such as system reboot, that would require them to regain access. Learn more: https://attack.mitre.org/tactics/TA0003/
+Results:
+Returns information such as scheduled tasks, Windows startup items, and driver information.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM autoexec;
+Edit SQL
+Vulnerability Management
+Windows Print Spooler Elevation of Privilege Vulnerability (CVE-2020-1048)
+Schedule
+Description:
+List any suspicious printer port entries that may have been installed as part of CVE-2020-1048. When CVE-2020-1048 is exploited, a non-standard file entry will appear in the list of installed printer ports. When this vulnerability is patched, persistence entries will still be present. Learn more: https://portal.msrc.microsoft.com/en-US/security-guidance/advisory/CVE-2020-1048
+Results:
+Returns suspicious printer port entries installed as part of CVE-2020-1048. After patching this vulnerability, malicious printer ports will still be present and need to be removed manually. If results are returned, investigate immediately and remove the entries to clean up persistence.
+Carbon Black recommends that you run this query as needed
+
+SELECT name
+FROM registry
+WHERE PATH like 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Ports\%.txt'
+  OR PATH like 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Ports\%.exe'
+  OR PATH like 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Ports\%.dll';
+Edit SQL
+Vulnerability Management
+Windows SMBv3 Client/Server Remote Code Execution Vulnerability (CVE-2020-0796)
+Schedule
+Description:
+Discover SMB servers potentially vulnerable to CVE-2020-0796. Indicates vulnerability when shares are present, SMB compression is enabled, and Windows build is 18362 or 18363. To further validate existing SMB servers, see the IT Hygiene query Rogue Share detection. Learn more: https://portal.msrc.microsoft.com/en-US/security-guidance/advisory/CVE-2020-0796
+Results:
+Flags SMB servers as vulnerable when shares are present, compression is enabled, and Windows build is 18362 or 18363. Possible future false-positives after patches are available and applied.
+Carbon Black recommends that you run this query as needed
+
+SELECT CASE
+           WHEN EXISTS
+                  (SELECT build,
+                          shares,
+                          disablecompression,
+                          patched
+                   FROM
+                     (SELECT build
+                      FROM os_version),
+                     (SELECT count(name) AS shares
+                      FROM shared_resources
+                      WHERE NOT lower(name) = "admin$"
+                        AND NOT lower(name) = "ipc$"
+                        AND NOT lower(name) = "c$"),
+                     (SELECT CASE
+                                 WHEN EXISTS
+                                        (SELECT DATA
+                                         FROM registry
+                                         WHERE PATH='HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters\DisableCompression'
+                                           AND DATA=1) THEN 'TRUE'
+                                 ELSE 'FALSE'
+                             END AS disablecompression),
+                     (SELECT CASE
+                                 WHEN EXISTS
+                                        (SELECT hotfix_id
+                                         FROM patches
+                                         WHERE hotfix_id = "KB4551762") THEN 'TRUE'
+                                 ELSE 'FALSE'
+                             END AS patched)
+                   WHERE (build = 18362
+                          OR build = 18363)
+                     AND shares > 0
+                     AND disablecompression = 'FALSE'
+                     AND patched = 'FALSE') THEN 'Vulnerable'
+           ELSE 'Not Vulnerable'
+       END 'SMBv3 CVE-2020-0796';
+Edit SQL
+Compliance
+Windows Update Settings (UPDATED)
+Schedule
+Description:
+Automatic Windows updates are critical to patch vulnerabilities before an attack. Learn more: https://docs.microsoft.com/en-us/windows/deployment/update/waas-wu-settings
+Results:
+Returns 0 if the NoAutoUpdate option is enabled, or 1 if it is disabled.
+Carbon Black recommends that you run this query as needed
+
+WITH nau AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 0 THEN "ENABLED"
+              WHEN DATA = 1 THEN "DISABLED"
+          END "autoupdate_status"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "NoAutoUpdate"),
+     auo AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 2 THEN "Notify before download"
+              WHEN DATA = 3 THEN "Automatically download and notify of installation"
+              WHEN DATA = 4 THEN "Automatic download and scheduled installation. (Only valid if values exist for ScheduledInstallDay and ScheduledInstallTime.)"
+              WHEN DATA = 5 THEN "Automatic Updates is required, but end users can configure it"
+          END "autoupdate_options"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "AUOptions"),
+     aimu AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 0 THEN "Treat minor updates like other updates"
+              WHEN DATA = 1 THEN "Silently install minor updates"
+          END "auto_install_minor_updates"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "AutoInstallMinorUpdates"),
+     df AS
+  (SELECT 1 AS "one",
+          DATA AS "detection_frequency"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "DetectionFrequency"),
+     dfe AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 0 THEN "DISABLED (use default value of 22 hours)"
+              WHEN DATA = 1 THEN "ENABLED"
+          END "detection_frequency_enabled"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "DetectionFrequencyEnabled"),
+     nar AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 0 THEN "Automatic Updates notifies user that the computer will restart in 5 minutes"
+              WHEN DATA = 1 THEN "Logged-on user gets to choose whether or not to restart his or her computer"
+          END "no_auto_reboot"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "NoAutoRebootWithLoggedOnUsers"),
+     rrt AS
+  (SELECT 1 AS "one",
+          DATA AS "reboot_relaunch_timeout"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "RebootRelaunchTimeout"),
+     rrte AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 0 THEN "Disable custom RebootRelaunchTimeout(use default value of 10 minutes)"
+              WHEN DATA = 1 THEN "ENABLED"
+          END "reboot_relaunch_timeout_enabled"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "RebootRelaunchTimeoutEnabled"),
+     rwt AS
+  (SELECT 1 AS "one",
+          DATA AS "reboot_warning_timeout"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "RebootWarningTimeout"),
+     rwte AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 0 THEN "Disable custom RebootRelaunchTimeout(use default value of 10 minutes)"
+              WHEN DATA = 1 THEN "ENABLED"
+          END "reboot_warning_timeout_enabled"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "RebootWarningTimeoutEnabled"),
+     rewt AS
+  (SELECT 1 AS "one",
+          DATA AS "reschedule_wait_time"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "RescheduleWaitTime"),
+     rewte AS
+  (SELECT 1 AS "one",
+          CASE
+              WHEN DATA = 0 THEN "Disable RescheduleWaitTime(attempt the missed installation during the next scheduled installation time)"
+              WHEN DATA = 1 THEN "ENABLED"
+          END "reschedule_wait_time_enabled"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "RescheduleWaitTimeEnabled"),
+     sid AS
+  (SELECT 1 AS "one",
+          DATA AS "scheduled_install_day"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "ScheduledInstallDay"),
+     sit AS
+  (SELECT 1 AS "one",
+          DATA AS "scheduled_install_time"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "ScheduledInstallTime"),
+     uws AS
+  (SELECT 1 AS "one",
+          DATA AS "use_wuserver"
+   FROM registry
+   WHERE KEY = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+     AND name = "UseWUServer")
+SELECT autoupdate_status,
+       autoupdate_options,
+       auto_install_minor_updates,
+       detection_frequency,
+       detection_frequency_enabled,
+       no_auto_reboot,
+       reboot_relaunch_timeout,
+       reboot_relaunch_timeout_enabled,
+       reboot_warning_timeout,
+       reboot_warning_timeout_enabled,
+       reschedule_wait_time,
+       reschedule_wait_time_enabled,
+       scheduled_install_day,
+       scheduled_install_time,
+       use_wuserver
+FROM nau
+LEFT JOIN auo USING(one)
+LEFT JOIN aimu USING(one)
+LEFT JOIN df USING(one)
+LEFT JOIN dfe USING(one)
+LEFT JOIN nar USING(one)
+LEFT JOIN rrt USING(one)
+LEFT JOIN rrte USING(one)
+LEFT JOIN rwt USING(one)
+LEFT JOIN rwte USING(one)
+LEFT JOIN rewt USING(one)
+LEFT JOIN rewte USING(one)
+LEFT JOIN sid USING(one)
+LEFT JOIN sit USING(one)
+LEFT JOIN uws USING(one);
+Edit SQL
+Vulnerability Management
+Windows ZeroLogon Vulnerability (CVE-2020-1472) Registry Setting
+Schedule
+Description:
+Determines if registry enforcement is enabled for NetLogons related to the CVE-2020-1472 vulnerability. If this registry modification is enabled Domain Controllers will deny vulnerable Netlogon secure channel connections unless the account is allowed by the Create Vulnerable Connection list in the "Domain controller Allow vulnerable Netlogon secure channel connections" group policy. Learn more: https://portal.msrc.microsoft.com/en-US/security-guidance/advisory/CVE-2020-1472
+Results:
+If the FullSecureChannelProtection key value is set to 1, the query will return as Enabled. If set to 0 or the registry value is not located the query will return as Not Enabled.
+Carbon Black recommends that you run this query as needed
+
+SELECT CASE cnt
+           WHEN 1 THEN "Enabled"
+           ELSE "NOT Enabled"
+       END "(CVE-2020-1472) FullSecureChannelProtection"
+FROM
+  (SELECT count(name) AS cnt
+   FROM registry
+   WHERE PATH='HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Netlogon\\Parameters\\FullSecureChannelProtection'
+     AND DATA = 1);
+Edit SQL
+Threat Hunting
+Windows ZeroLogon Vulnerability (CVE-2020-1472) System Event Logs
+Schedule
+Description:
+Searches the System event log for entries related to CVE-2020-1472 (specifically event IDs 5827, 5828, 5829, 5830, 5831). Learn more: https://support.microsoft.com/en-us/help/4557222/how-to-manage-the-changes-in-netlogon-secure-channel-connections-assoc
+Results:
+If any entries are located where the event ID is 5827, 5828, 5829, 5830,or 5831 the result will provide the data related to the event log entry.
+Carbon Black recommends that you run this query as needed
+
+SELECT DATA
+FROM windows_eventlog
+WHERE channel = 'System'
+  AND (eventid = '5827'
+       OR eventid = '5828'
+       OR eventid = '5829'
+       OR eventid = '5830'
+       OR eventid = '5831');
+Edit SQL
+Threat Hunting
+Windows ZeroLogon Vulnerability (CVE-2020-1472) Yara Scan
+Schedule
+Description:
+Performs a Yara scan recursively of the C:\Windows\Temp directory for variants related to a public POC of CVE-2020-1472 exploit (https://github.com/dirkjanm/CVE-2020-1472/blob/master/cve-2020-1472-exploit.py). The Window's temp directory was chosen as an example, and we highly recommend that users modify this and other Yara queries to meet their threat hunting needs.
+Results:
+If the yara signature hits on a file, the results will provide the full path of the file as well as the string variable name that matched and the offset (in hex) where the string matched. In case of timeout, modify your query in the SQL tab to focus on a more targeted path. Expand the query below using the "+" sign and click "Edit SQL" to open a new SQL Query with the existing code.
+Carbon Black recommends that you run this query as needed
+
+SELECT *
+FROM yara
+WHERE PATH LIKE 'c:\Windows\Temp\%%'
+  AND sigrule = 'rule CVE_2020_1472_Q3_2020
+{
+    meta:
+                author = "Carbon Black TAU" /* ACostis */
+                date = "2020-Sep-16"
+                description = "The purpose of this signature is to match on certain code found in https://github.com/dirkjanm/CVE-2020-1472/blob/master/cve-2020-1472-exploit.py"
+                Rule_Version = "1"
+                Yara_Version = "3.8.1"
+                Priority = "Low"
+                TLP = "Green"
+    strings:
+                $s1 = "NetrServerPasswordSet2" wide ascii fullword nocase
+                $s2 = "NETLOGON_SECURE_CHANNEL_TYPE" wide ascii fullword nocase
+                $s3 = "NETLOGON_AUTHENTICATOR" wide ascii fullword nocase
+                $s4 = "DCERPCTransportFactory" wide ascii fullword nocase
+    condition:
+                uint16(0) == 0x5A4D and
+                filesize < 2MB and
+                any of them
+}';
+Edit SQL
+Threat Hunting
+WMI CLI Event Consumers
+Schedule
+Description:
+WMI CLI event consumers are a stealthy way for attackers to subscribe to system events and trigger code execution via the command line when the event occurs, thereby evading detection. Recommended best practice is to document normal event subscriptions to identify outliers. Learn more: https://attack.mitre.org/techniques/T1546/003/
+Results:
+Returns all WMI CLI Event Consumers registered on a target system.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM wmi_cli_event_consumers;
+Edit SQL
+Threat Hunting
+WMI Event Consumer Mappings
+Schedule
+Description:
+WMI Event consumers are a stealthy way for attackers to subscribe to system events and trigger code execution and evade detection. Mapping the consumer to the event filter can reveal the intentions behind an attack. Recommended best practice is to document normal event subscriptions to identify outliers. Learn more: https://attack.mitre.org/techniques/T1546/003/
+Results:
+Returns the relationship between the WMI event consumer and the filter, if present on the target Windows system. On Windows 10, there are no event consumers by default.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM wmi_filter_consumer_binding;
+Edit SQL
+Threat Hunting
+WMI Event Filters
+Schedule
+Description:
+WMI Event Filters are system events that trigger other events, which attackers use in conjunction with Event Consumers to evade attack. Because an attacker can configure several types of filters, the recommended best practice is to document normal event subscriptions to identify outliers. Learn more: https://attack.mitre.org/techniques/T1546/003/
+Results:
+Returns all WMI Event Filters registered on a target system, if present on the Windows target system. On Windows 10, there are no filters by default.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM wmi_event_filters;
+Edit SQL
+Threat Hunting
+WMI Script Event Consumers
+Schedule
+Description:
+WMI Script Event Consumers allow adversaries to subscribe to system events and trigger code execution via script when the event occurs, thereby evading detection. Recommended best practice is to document normal event subscriptions to identify outliers. Learn more: https://attack.mitre.org/techniques/T1546/003/
+Results:
+Returns all registered WMI Script Event Consumers, if present. On Windows 10, there are no consumers by default.
+Carbon Black recommends that you run this query weekly
+
+SELECT *
+FROM wmi_script_event_consumers;
